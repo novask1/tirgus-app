@@ -1,0 +1,2987 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tirgus</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Inter', sans-serif; background: #f2f4f7; margin: 0; -webkit-font-smoothing: antialiased; }
+
+        /* Azul báltico */
+        :root { --baltic: #006994; --baltic-light: #e6f3f8; }
+
+        /* ── Vistas ── */
+        .view { display: none; position: fixed; inset: 0; overflow-y: auto; background: #f2f4f7; z-index: 10; padding-bottom: 64px; }
+        .view.active { display: block; }
+        #product-view  { z-index: 40; padding-bottom: 84px; }
+        #productActionBar {
+            display: none; position: fixed; bottom: 0; left: 0; right: 0;
+            background: #fff; border-top: 1px solid #e8ecf0;
+            padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom));
+            z-index: 45; gap: 10px;
+        }
+        #productActionBar.open { display: flex; }
+        #chat-view     { z-index: 30; display: none; flex-direction: column; padding-bottom: 0; }
+        #chat-view.active { display: flex; }
+
+        /* ── Navbar inferior ── */
+        #bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: #fff; border-top: 1px solid #e8ecf0; z-index: 50; display: flex; }
+        #bottom-nav button {
+            flex: 1; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 3px; font-size: 10px; font-weight: 500;
+            color: #b0b8c4; border: none; background: none; cursor: pointer;
+            transition: color .2s; letter-spacing: .02em;
+        }
+        #bottom-nav button.active-tab { color: var(--baltic); }
+        #bottom-nav button svg { width: 22px; height: 22px; stroke-width: 1.6; }
+
+        /* ── Tarjetas producto ── */
+        .product-card { cursor: pointer; border-radius: 14px; overflow: hidden; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.05); transition: transform .15s, box-shadow .15s; }
+        .product-card:active { transform: scale(.97); }
+        .card-price { font-size: 15px; font-weight: 700; color: var(--baltic); line-height: 1.2; }
+        .card-title { font-size: 13px; font-weight: 500; color: #1a1a2e; line-height: 1.4; }
+        .card-location { font-size: 11px; color: #b0b5bf; font-weight: 400; margin-top: 2px; }
+
+        /* Imagen 1:1 */
+        .card-img-wrap { position: relative; aspect-ratio: 1 / 1; overflow: hidden; background: #e6f3f8; }
+        .card-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .35s ease; }
+        .product-card:hover .card-img-wrap img { transform: scale(1.04); }
+
+        /* Botón favorito */
+        .card-fav {
+            position: absolute; top: 8px; right: 8px;
+            width: 30px; height: 30px; border-radius: 50%;
+            background: rgba(255,255,255,.82); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+            border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 1px 5px rgba(0,0,0,.15); transition: transform .15s, background .15s; z-index: 2;
+        }
+        .card-fav:active { transform: scale(.82); }
+        .card-fav svg { width: 14px; height: 14px; stroke: #94a3b8; fill: none; transition: stroke .15s, fill .15s; }
+        .card-fav.fav-active { background: #fff0f2; }
+        .card-fav.fav-active svg { stroke: #e11d48; fill: #e11d48; }
+
+        /* Badge de estado */
+        .card-badge {
+            position: absolute; bottom: 8px; left: 8px;
+            font-size: 10px; font-weight: 700; padding: 3px 7px;
+            border-radius: 6px; letter-spacing: .02em; line-height: 1.5; z-index: 2;
+        }
+
+        /* ── Badge "RESERVADO" en esquina superior izquierda ── */
+        .product-badge.reserved {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: #D4AF37;
+            color: #000;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: bold;
+            border-radius: 4px;
+            z-index: 10;
+        }
+
+        /* ── Burbujas chat ── */
+        .bubble-me {
+            background: var(--baltic); color: #fff;
+            border-radius: 18px 18px 4px 18px;
+            box-shadow: 0 1px 3px rgba(0,105,148,.18);
+        }
+        .bubble-other {
+            background-color: #ffffff;
+            color: #333333;
+            border: 1px solid #e0e0e0;
+            border-radius: 18px 18px 18px 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,.05);
+        }
+
+        /* ── Message status (ticks) ── */
+        .message-status { display: inline-flex; align-items: center; gap: 1px; line-height: 1; }
+        .bubble-me .message-status { color: rgba(255,255,255,0.5); }
+        .bubble-me .message-status.read {
+            color: #fff;
+            filter: drop-shadow(0 0 4px rgba(255,255,255,0.55));
+        }
+
+        /* ── Product header (inside chat) ── */
+        #chatProductHeader {
+            display: none; margin: 10px 12px 0; border-radius: 14px;
+            background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.09);
+            padding: 11px 13px 12px; flex-shrink: 0;
+        }
+        #chatProductHeader.visible { display: block; }
+        .chat-prod-btn {
+            flex: 1; padding: 9px 6px; border-radius: 10px; font-size: 12.5px;
+            font-weight: 600; cursor: pointer; font-family: inherit;
+            transition: opacity .15s;
+        }
+        .chat-prod-btn:active { opacity: .8; }
+
+        /* ── Offer modal ── */
+        #offerModal {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,.45); z-index: 200;
+            align-items: flex-end; justify-content: center;
+        }
+        #offerModal.open { display: flex; }
+        #offerSheet {
+            background: #fff; width: 100%; max-width: 480px;
+            border-radius: 20px 20px 0 0; padding: 24px 20px 36px;
+            animation: slideUp .26s ease;
+        }
+
+        /* ── Swipe-to-delete (chat list) ── */
+        .swipe-wrapper { position: relative; overflow: hidden; }
+        .swipe-bg {
+            position: absolute; inset: 0; background: #ef4444;
+            display: flex; align-items: center; padding-left: 24px;
+            opacity: 0;
+        }
+        .swipe-icon {
+            width: 28px; height: 28px; color: #fff;
+            transform: scale(0.4); flex-shrink: 0;
+        }
+        .swipe-item { position: relative; background: #fff; will-change: transform; }
+
+        /* ── Quick reply chips ── */
+        #quick-replies { display: flex; gap: 8px; overflow-x: auto; padding: 8px 14px 10px; scrollbar-width: none; background: #fff; border-top: 1px solid #f1f5f9; flex-shrink: 0; }
+        #quick-replies::-webkit-scrollbar { display: none; }
+        .quick-chip {
+            flex-shrink: 0; padding: 6px 13px; border-radius: 20px;
+            border: 1.5px solid var(--baltic); color: var(--baltic);
+            background: #fff; font-size: 12px; font-weight: 500;
+            cursor: pointer; white-space: nowrap; transition: background .12s, color .12s;
+            font-family: inherit;
+        }
+        .quick-chip:active { background: var(--baltic); color: #fff; }
+
+        /* ── Botones producto ── */
+        .btn-primary  { background: var(--baltic); color: #fff; border-radius: 12px; padding: 15px; font-weight: 700; font-size: 15px; width: 100%; border: none; cursor: pointer; }
+        .btn-primary:active  { opacity: .85; }
+        .btn-outline  { background: #fff; color: var(--baltic); border: 2px solid var(--baltic); border-radius: 12px; padding: 13px; font-weight: 700; font-size: 15px; width: 100%; cursor: pointer; }
+        .btn-outline:active  { background: var(--baltic-light); }
+
+        /* ── Botón publicar (FAB-like) ── */
+        #btn-publish {
+            width: 36px; height: 36px; border-radius: 10px;
+            background: var(--baltic); color: #fff;
+            border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: opacity .15s;
+        }
+        #btn-publish:active { opacity: .8; }
+
+        /* ── Modal publicar ── */
+        #publish-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45);
+            z-index: 100; align-items: flex-end; justify-content: center;
+        }
+        #publish-overlay.open { display: flex; }
+        #publish-sheet {
+            background: #fff; width: 100%; max-width: 480px; border-radius: 20px 20px 0 0;
+            max-height: 92vh; overflow-y: auto; padding: 24px 20px 36px;
+            animation: slideUp .28s ease;
+        }
+        @keyframes slideUp { from { transform: translateY(60px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* Drag handle */
+        .sheet-handle { width: 40px; height: 4px; background: #d1d5db; border-radius: 99px; margin: 0 auto 20px; }
+
+        /* Inputs del formulario */
+        .form-label  { font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; display: block; }
+        .form-input  { width: 100%; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 11px 14px; font-size: 14px; color: #111; outline: none; transition: border-color .15s; }
+        .form-input:focus { border-color: var(--baltic); }
+        textarea.form-input { resize: none; }
+        select.form-input  { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+
+        /* Área de fotos */
+        #photoPreviewArea { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+        .photo-thumb { width: 72px; height: 72px; border-radius: 8px; object-fit: cover; position: relative; }
+        #addPhotoBtn {
+            width: 72px; height: 72px; border-radius: 8px; border: 2px dashed #cbd5e1;
+            background: #f8fafc; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; cursor: pointer; color: #94a3b8; font-size: 11px; gap: 2px;
+        }
+        #addPhotoBtn svg { width: 22px; height: 22px; }
+
+        /* Stars */
+        .stars { color: #f59e0b; }
+
+        /* ── Auth view ── */
+        #auth-view { z-index: 9999; }
+        .auth-shake { animation: shake .35s ease; }
+        @keyframes shake {
+            0%,100% { transform: translateX(0); }
+            20%      { transform: translateX(-6px); }
+            60%      { transform: translateX(6px); }
+        }
+
+        /* Scrollbar delgado */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+
+        /* ── Inputs de perfil ── */
+        .prof-input {
+            width: 100%; border: 1.5px solid #edf0f3; border-radius: 10px;
+            padding: 10px 13px; font-size: 14px; font-family: inherit;
+            color: #1a1a2e; background: #f8fafc; outline: none;
+            transition: border-color .15s, background .15s;
+        }
+        .prof-input:focus { border-color: var(--baltic); background: #fff; }
+
+        /* ── Toggle switch ── */
+        .toggle-switch {
+            width: 42px; height: 24px; border-radius: 99px; background: #d1d5db;
+            position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0;
+        }
+        .toggle-switch.active { background: var(--baltic); }
+        .toggle-thumb {
+            position: absolute; top: 3px; left: 3px;
+            width: 18px; height: 18px; border-radius: 50%; background: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .2s;
+        }
+        .toggle-switch.active .toggle-thumb { transform: translateX(18px); }
+
+        /* ── Filtros — dual range slider ── */
+        #filter-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45);
+            z-index: 150; align-items: flex-end; justify-content: center;
+        }
+        #filter-overlay.open { display: flex; }
+        #filter-sheet {
+            background: #fff; width: 100%; max-width: 480px;
+            border-radius: 20px 20px 0 0; max-height: 88vh; overflow-y: auto;
+            padding: 24px 20px 36px; animation: slideUp .28s ease;
+        }
+
+        /* Dual range */
+        .dual-range { position: relative; height: 36px; margin: 8px 0 4px; }
+        .range-track-bg {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            height: 4px; width: 100%; background: #e2e8f0; border-radius: 99px;
+        }
+        #range-fill {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            height: 4px; background: var(--baltic); border-radius: 99px;
+            left: 0; width: 100%;
+        }
+        .dual-range input[type=range] {
+            position: absolute; width: 100%; height: 4px; background: none;
+            pointer-events: none; -webkit-appearance: none; appearance: none;
+            outline: none; top: 50%; transform: translateY(-50%); margin: 0; padding: 0;
+        }
+        .dual-range input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+            background: var(--baltic); cursor: pointer; pointer-events: all;
+            border: 2.5px solid #fff; box-shadow: 0 1px 4px rgba(0,105,148,.35);
+        }
+        .dual-range input[type=range]::-moz-range-thumb {
+            width: 22px; height: 22px; border-radius: 50%; background: var(--baltic);
+            cursor: pointer; pointer-events: all;
+            border: 2.5px solid #fff; box-shadow: 0 1px 4px rgba(0,105,148,.35);
+        }
+
+        /* Condition checkbox pills */
+        .cond-pill { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; cursor: pointer; transition: border-color .15s, background .15s; }
+        .cond-pill:has(input:checked) { border-color: var(--baltic); background: var(--baltic-light); }
+        .cond-pill input[type=checkbox] { accent-color: var(--baltic); width: 16px; height: 16px; cursor: pointer; }
+        .cond-pill span { font-size: 13px; font-weight: 500; color: #374151; }
+        .cond-pill:has(input:checked) span { color: var(--baltic); font-weight: 600; }
+
+        /* Filter button */
+        #btn-filters {
+            width: 42px; height: 42px; border-radius: 12px; border: 1.5px solid #e2e8f0;
+            background: #fff; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; flex-shrink: 0; position: relative; transition: all .15s; color: #6b7280;
+        }
+        #btn-filters:active { opacity: .8; }
+        #filter-badge {
+            position: absolute; top: -4px; right: -4px; width: 10px; height: 10px;
+            background: var(--baltic); border-radius: 50%; border: 2px solid #fff;
+            display: none;
+        }
+        /* Filter section labels */
+        .filter-label { font-size: 11px; font-weight: 700; color: #b0b5bf; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 12px; }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════
+     HOME — Explorar
+══════════════════════════════════ -->
+<div id="home-view" class="view active">
+    <div class="max-w-md mx-auto">
+
+        <!-- Header -->
+        <div class="sticky top-0 bg-white border-b border-slate-100 z-20 flex items-center justify-between" style="padding:14px 18px;">
+            <span class="font-extrabold tracking-tight" style="color:var(--baltic);font-size:22px;letter-spacing:-.4px;">Tirgus</span>
+            <button id="btn-publish" onclick="openPublish()" title="Publicar objeto">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="18" height="18">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Buscador + filtros -->
+        <div style="padding:10px 16px 12px;display:flex;gap:8px;align-items:center;">
+            <div class="relative flex-1">
+                <svg class="absolute left-3 top-2.5 text-slate-400 w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="top:50%;transform:translateY(-50%);">
+                    <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/>
+                </svg>
+                <input type="text" id="search-input" placeholder="Buscar en Tirgus..."
+                    oninput="applyFilters()"
+                    class="w-full focus:outline-none"
+                    style="padding:11px 14px 11px 36px;background:#eef0f3;border:none;border-radius:12px;font-size:14px;color:#1a1a2e;font-family:inherit;width:100%;">
+            </div>
+            <button id="btn-filters" onclick="openFilters()" title="Filtros">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M7 12h10M11 18h2"/>
+                </svg>
+                <span id="filter-badge"></span>
+            </button>
+        </div>
+
+        <!-- Grid -->
+        <div class="pb-6" style="padding-left:16px;padding-right:16px;">
+            <div id="productsGrid" class="grid grid-cols-2" style="gap:12px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════
+     MENSAJES — Lista de chats
+══════════════════════════════════ -->
+<div id="messages-view" class="view">
+    <div class="max-w-md mx-auto">
+        <div class="sticky top-0 bg-white border-b border-slate-100 px-4 py-3 z-20 flex items-center gap-3">
+            <button onclick="showTab('home')" class="text-slate-500" style="background:none;border:none;cursor:pointer;padding:4px;display:flex;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/>
+                </svg>
+            </button>
+            <h1 class="text-xl font-bold text-slate-900">Mensajes</h1>
+        </div>
+        <div id="chatList" class="divide-y divide-slate-100"></div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════
+     GUARDADOS
+══════════════════════════════════ -->
+<div id="saved-view" class="view">
+    <div class="max-w-md mx-auto">
+        <div class="sticky top-0 bg-white border-b border-slate-100 px-4 py-3 z-20 flex items-center gap-3">
+            <button onclick="showTab('home')" class="text-slate-500" style="background:none;border:none;cursor:pointer;padding:4px;display:flex;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/>
+                </svg>
+            </button>
+            <h1 class="text-xl font-bold text-slate-900 flex-1">Guardados</h1>
+            <span id="saved-count-label" style="font-size:13px;color:#94a3b8;"></span>
+        </div>
+        <div style="padding:16px;">
+            <div id="savedGrid" class="grid grid-cols-2" style="gap:12px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════
+     PERFIL
+══════════════════════════════════ -->
+<div id="profile-view" class="view" style="background:#f2f4f7;">
+    <div class="max-w-md mx-auto" style="padding-bottom:32px;">
+
+        <!-- ── Header ── -->
+        <div class="sticky top-0 z-20 flex items-center gap-3" style="background:#f2f4f7;padding:14px 18px 10px;">
+            <button onclick="showTab('home')" class="text-slate-500" style="background:none;border:none;cursor:pointer;padding:4px;display:flex;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/>
+                </svg>
+            </button>
+            <span style="font-size:17px;font-weight:700;color:#1a1a2e;flex:1;">Mi perfil</span>
+            <button onclick="confirmLogout()" style="font-size:12px;font-weight:500;color:#94a3b8;background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:8px;">
+                Cerrar sesión
+            </button>
+        </div>
+
+        <!-- ── SECCIÓN 1: Fotos ── -->
+        <div style="margin:8px 16px 0;background:#fff;border-radius:16px;overflow:hidden;">
+            <!-- Portada -->
+            <div id="coverContainer" style="height:110px;background:linear-gradient(135deg,#006994 0%,#0099cc 100%);position:relative;cursor:pointer;" onclick="document.getElementById('coverInput').click()">
+                <div style="position:absolute;bottom:8px;right:10px;background:rgba(0,0,0,.35);border-radius:8px;padding:4px 10px;display:flex;align-items:center;gap:5px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    <span style="font-size:11px;color:#fff;font-weight:500;">Cambiar portada</span>
+                </div>
+                <input type="file" id="coverInput" accept="image/*" style="display:none" onchange="previewCover(event)">
+            </div>
+            <!-- Avatar sobre la portada -->
+            <div style="padding:0 18px 18px;position:relative;">
+                <div style="position:relative;display:inline-block;margin-top:-34px;">
+                    <div id="avatarRing" style="width:68px;height:68px;border-radius:50%;border:3px solid #fff;overflow:hidden;background:var(--baltic);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.15);">
+                        <span id="avatarInitial" style="font-size:26px;font-weight:700;color:#fff;">J</span>
+                        <img id="avatarImg" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;">
+                    </div>
+                    <button onclick="document.getElementById('avatarInput').click()" style="position:absolute;bottom:-2px;right:-2px;width:22px;height:22px;border-radius:50%;background:var(--baltic);border:2px solid #fff;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
+                    </button>
+                    <input type="file" id="avatarInput" accept="image/*" style="display:none" onchange="previewAvatar(event)">
+                </div>
+                <div style="margin-top:10px;">
+                    <!-- Nombre — editable inline -->
+                    <input type="text" id="prof-username" value="Juan Pérez"
+                        class="prof-input"
+                        placeholder="Tu nombre de usuario"
+                        style="font-size:16px;font-weight:700;color:#1a1a2e;background:transparent;border-color:transparent;padding:2px 0;width:100%;margin-bottom:3px;transition:all .18s;"
+                        onfocus="this.style.background='#fff';this.style.borderColor='var(--baltic)';this.style.padding='6px 10px';"
+                        onblur="this.style.background='transparent';this.style.borderColor='transparent';this.style.padding='2px 0';">
+                    <!-- Estrellas + stats -->
+                    <div id="prof-stats-row" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-height:20px;margin-bottom:7px;">
+                        <div id="prof-stars" style="display:inline-flex;align-items:center;gap:1px;"></div>
+                        <span id="prof-rating-num" style="font-size:12px;font-weight:600;color:#374151;"></span>
+                        <span id="prof-sales" style="font-size:12px;color:#b0b5bf;"></span>
+                        <span id="prof-since" style="font-size:12px;color:#b0b5bf;"></span>
+                    </div>
+                    <!-- Bio — editable inline -->
+                    <textarea id="prof-bio" class="prof-input" rows="2"
+                        placeholder="Añade una bio… ¿qué vendes? ¿dónde estás?"
+                        style="resize:none;font-size:13px;line-height:1.5;background:transparent;border-color:transparent;padding:2px 0;width:100%;transition:all .18s;"
+                        onfocus="this.style.background='#fff';this.style.borderColor='var(--baltic)';this.style.padding='8px 10px';"
+                        onblur="this.style.background='transparent';this.style.borderColor='transparent';this.style.padding='2px 0';"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SECCIÓN 2: Información pública ── -->
+        <div style="margin:10px 16px 0;background:#fff;border-radius:16px;padding:18px;">
+            <p style="font-size:11px;font-weight:700;color:#b0b5bf;letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px;">Información pública</p>
+
+            <!-- Email (solo lectura) -->
+            <div style="margin-bottom:14px;">
+                <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px;">Email</label>
+                <input type="email" id="prof-email" class="prof-input" readonly
+                    style="background:#f8fafc;color:#94a3b8;cursor:default;"
+                    placeholder="tu@correo.com">
+            </div>
+            <!-- Ubicación -->
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px;">Ubicación</label>
+                <div style="position:relative;">
+                    <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.45;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#006994" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                    <input type="text" id="prof-location" value="Lince, Lima" class="prof-input" style="padding-left:32px;" placeholder="Tu ciudad">
+                </div>
+            </div>
+
+            <!-- Mapa simulado -->
+            <div style="border-radius:12px;overflow:hidden;height:120px;background:#e8edf2;position:relative;margin-top:4px;">
+                <img src="https://api.mapbox.com/styles/v1/mapbox/light-v11/static/-77.0282,-12.0758,13,0/400x240@2x?access_token=pk.placeholder" alt=""
+                    onerror="this.style.display='none'"
+                    style="width:100%;height:100%;object-fit:cover;">
+                <!-- Fallback visual si no carga el mapa -->
+                <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#006994" stroke-width="1.6" opacity=".5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+                    <span style="font-size:11px;color:#94a3b8;font-weight:500;">Lince, Lima · Perú</span>
+                </div>
+                <!-- Pin central -->
+                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);width:18px;height:18px;background:var(--baltic);border-radius:50% 50% 50% 0;transform:translate(-50%,-60%) rotate(-45deg);box-shadow:0 2px 6px rgba(0,105,148,.4);"></div>
+            </div>
+        </div>
+
+        <!-- ── SECCIÓN 3: Tipo de cuenta ── -->
+        <div style="margin:10px 16px 0;background:#fff;border-radius:16px;padding:18px;">
+            <p style="font-size:11px;font-weight:700;color:#b0b5bf;letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px;">Tipo de cuenta</p>
+            <div style="display:flex;gap:10px;">
+                <!-- Personal -->
+                <div id="acct-personal" onclick="selectAccount('personal')"
+                    style="flex:1;border:2px solid var(--baltic);border-radius:12px;padding:14px 12px;cursor:pointer;background:var(--baltic-light);">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--baltic)" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                        <span style="font-size:13px;font-weight:700;color:var(--baltic);">Personal</span>
+                    </div>
+                    <p style="font-size:11px;color:#6b7280;line-height:1.4;">Para vender objetos de segunda mano de forma puntual.</p>
+                </div>
+                <!-- Negocio -->
+                <div id="acct-business" onclick="selectAccount('business')"
+                    style="flex:1;border:2px solid #e2e8f0;border-radius:12px;padding:14px 12px;cursor:pointer;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 8v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                        <span style="font-size:13px;font-weight:700;color:#374151;">Negocio</span>
+                    </div>
+                    <p style="font-size:11px;color:#6b7280;line-height:1.4;">Para tiendas y vendedores profesionales con stock regular.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SECCIÓN 4: Ajustes de cuenta ── -->
+        <div style="margin:10px 16px 0;background:#fff;border-radius:16px;overflow:hidden;">
+            <p style="font-size:11px;font-weight:700;color:#b0b5bf;letter-spacing:.06em;text-transform:uppercase;padding:16px 18px 10px;">Ajustes de cuenta</p>
+            <!-- Fila: notificaciones -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid #f2f4f7;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#006994" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17H9a3 3 0 01-3-3V9a6 6 0 0112 0v5a3 3 0 01-3 3zM12 20v1"/></svg>
+                    <span style="font-size:14px;font-weight:500;color:#1a1a2e;">Notificaciones</span>
+                </div>
+                <div class="toggle-switch active" id="toggle-notif" onclick="toggleSwitch(this)">
+                    <div class="toggle-thumb"></div>
+                </div>
+            </div>
+            <!-- Fila: privacidad -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid #f2f4f7;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#006994" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    <span style="font-size:14px;font-weight:500;color:#1a1a2e;">Perfil público</span>
+                </div>
+                <div class="toggle-switch" id="toggle-public" onclick="toggleSwitch(this)">
+                    <div class="toggle-thumb"></div>
+                </div>
+            </div>
+            <!-- Fila: idioma -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid #f2f4f7;cursor:pointer;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#006994" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>
+                    <span style="font-size:14px;font-weight:500;color:#1a1a2e;">Idioma</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                    <span style="font-size:13px;color:#94a3b8;">Español</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b0b5bf" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-6-6-6"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Botón guardar ── -->
+        <div style="margin:16px 16px 0;">
+            <button onclick="saveProfile()" class="btn-primary" style="font-size:15px;letter-spacing:.01em;">
+                Guardar cambios
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<!-- ═══════════════════════════════
+     DETALLE DE PRODUCTO (fullscreen)
+══════════════════════════════════ -->
+<div id="product-view" class="view">
+    <div class="max-w-md mx-auto">
+        <div class="sticky top-0 bg-white border-b border-slate-100 px-4 py-3 z-20 flex items-center gap-3">
+            <button onclick="closeProduct()" class="text-slate-500">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/>
+                </svg>
+            </button>
+            <h2 class="font-semibold text-slate-900 flex-1 truncate text-base" id="productViewTitle">Producto</h2>
+        </div>
+        <div id="productViewContent"></div>
+    </div>
+</div>
+
+<!-- Sticky action bar del detalle de producto -->
+<div id="productActionBar"></div>
+
+<!-- ═══════════════════════════════
+     CHAT INDIVIDUAL
+══════════════════════════════════ -->
+<div id="chat-view" class="view">
+    <div class="max-w-md mx-auto w-full h-full flex flex-col">
+        <!-- Nav bar -->
+        <div class="bg-white border-b border-slate-100 px-4 py-3 flex items-center gap-3 flex-shrink-0">
+            <button onclick="closeChat()" class="text-slate-500">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/>
+                </svg>
+            </button>
+            <img id="chatAvatar" src="" alt="" class="w-9 h-9 rounded-full object-cover flex-shrink-0">
+            <p id="chatName" class="font-semibold text-slate-900 text-sm flex-1 truncate"></p>
+        </div>
+
+        <!-- Product header card (visible only when chat has product context) -->
+        <div id="chatProductHeader">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <img id="chatProdImg" src="" alt="" style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#e6f3f8;">
+                <div style="flex:1;min-width:0;">
+                    <p id="chatProdPrice" style="font-size:17px;font-weight:800;color:var(--baltic);line-height:1.1;"></p>
+                    <p id="chatProdTitle" style="font-size:12px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></p>
+                    <div id="chatProdSellerRow" style="display:none;align-items:center;gap:5px;margin-top:5px;">
+                        <img id="chatProdSellerAvatar" src="" alt=""
+                            style="width:20px;height:20px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1.5px solid #e2e8f0;">
+                        <span id="chatProdSellerName" style="font-size:11px;color:#94a3b8;"></span>
+                    </div>
+                </div>
+            </div>
+            <!-- Comprador: llenado dinámicamente por renderChatProductButtons() -->
+            <div id="chatProdBuyerBtns" style="display:none;gap:8px;margin-top:10px;"></div>
+            <!-- Vendedor: llenado dinámicamente por renderChatProductButtons() -->
+            <div id="chatProdSellerBtns" style="display:none;gap:8px;margin-top:10px;"></div>
+        </div>
+
+        <div id="messagesContainer" class="flex-1 overflow-y-auto px-4 py-3 space-y-3" style="background:#f8f9fa;"></div>
+        <div id="quick-replies">
+            <button class="quick-chip" onclick="useQuickReply('¿Cuál es tu último precio?')">¿Cuál es tu último precio?</button>
+            <button class="quick-chip" onclick="useQuickReply('¿En qué distrito entregas?')">¿En qué distrito entregas?</button>
+            <button class="quick-chip" onclick="useQuickReply('¿Está en buen estado?')">¿Está en buen estado?</button>
+        </div>
+        <div class="bg-white border-t border-slate-100 px-4 py-3 flex gap-2 flex-shrink-0">
+            <input id="messageInput" type="text" placeholder="Escribe un mensaje..."
+                class="flex-1 rounded-full border border-slate-200 px-4 py-2 text-sm focus:outline-none">
+            <button onclick="sendMessage()" class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-white" style="background:var(--baltic);">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════
+     OFFER MODAL
+══════════════════════════════════ -->
+<div id="offerModal" onclick="if(event.target===this)closeOfferModal()">
+    <div id="offerSheet">
+        <div style="width:36px;height:4px;border-radius:2px;background:#e2e8f0;margin:0 auto 18px;"></div>
+        <h3 style="font-size:18px;font-weight:700;color:#1a1a2e;margin:0 0 4px;">Hacer una oferta</h3>
+        <p id="offerProductLabel" style="font-size:13px;color:#64748b;margin:0 0 18px;"></p>
+        <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px;">Tu precio (S/)</label>
+        <div style="position:relative;">
+            <span style="position:absolute;left:13px;top:50%;transform:translateY(-50%);font-weight:700;color:#64748b;font-size:15px;">S/</span>
+            <input id="offerPriceInput" type="number" min="0" placeholder="0.00"
+                style="width:100%;padding:13px 13px 13px 36px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:16px;font-weight:600;outline:none;font-family:inherit;"
+                onfocus="this.style.borderColor='var(--baltic)'" onblur="this.style.borderColor='#e2e8f0'">
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px;">
+            <button onclick="closeOfferModal()"
+                style="flex:1;padding:14px;border-radius:12px;border:1.5px solid #e2e8f0;background:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;color:#374151;">
+                Cancelar
+            </button>
+            <button onclick="submitOffer()"
+                style="flex:1;padding:14px;border-radius:12px;border:none;background:var(--baltic);color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;">
+                Enviar oferta
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════
+     AUTH VIEW
+══════════════════════════════════ -->
+<div id="auth-view" class="view" style="background:#fff;padding-bottom:0;">
+    <div class="max-w-md mx-auto" style="min-height:100vh;display:flex;flex-direction:column;padding:0 24px;">
+
+        <!-- Botón volver -->
+        <div style="padding:14px 0 0;">
+            <button onclick="goBackFromAuth()" id="auth-back-btn" style="background:none;border:none;cursor:pointer;padding:4px;display:flex;align-items:center;gap:6px;color:#6b7280;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Logo + ilustración -->
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:60px;padding-bottom:32px;">
+            <div style="width:64px;height:64px;border-radius:18px;background:var(--baltic);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,105,148,.25);margin-bottom:20px;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+                </svg>
+            </div>
+            <h1 style="font-size:26px;font-weight:800;color:#1a1a2e;letter-spacing:-.5px;margin-bottom:6px;">Tirgus</h1>
+            <p style="font-size:15px;color:#6b7280;text-align:center;line-height:1.5;max-width:260px;" id="auth-subtitle">Únete a la comunidad de Lince y compra o vende cerca de ti</p>
+        </div>
+
+        <!-- Formulario email (oculto por defecto) -->
+        <div id="email-form" style="display:none;margin-bottom:16px;">
+            <div style="background:#f8fafc;border-radius:14px;padding:20px;margin-bottom:12px;">
+                <p style="font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:14px;" id="email-form-title">Crear cuenta</p>
+                <div id="field-name" style="margin-bottom:10px;">
+                    <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px;">Nombre completo</label>
+                    <input type="text" id="auth-name" class="prof-input" placeholder="Tu nombre">
+                </div>
+                <div style="margin-bottom:10px;">
+                    <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px;">Correo electrónico</label>
+                    <input type="email" id="auth-email" class="prof-input" placeholder="tu@correo.com">
+                </div>
+                <div style="margin-bottom:4px;">
+                    <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px;">Contraseña</label>
+                    <input type="password" id="auth-pass" class="prof-input" placeholder="Mínimo 6 caracteres">
+                </div>
+            </div>
+            <p id="auth-error" style="display:none;font-size:12px;color:#dc2626;background:#fef2f2;border-radius:8px;padding:8px 12px;margin-bottom:10px;"></p>
+            <button onclick="doLogin()" class="btn-primary" id="btn-do-login">Crear cuenta y entrar</button>
+            <p id="auth-switch-link" style="text-align:center;margin-top:12px;font-size:13px;color:#94a3b8;">
+                ¿Ya tienes cuenta? <span onclick="switchToLogin()" style="color:var(--baltic);font-weight:600;cursor:pointer;">Inicia sesión</span>
+            </p>
+        </div>
+
+        <!-- Botones principales -->
+        <div id="auth-buttons" style="padding-bottom:48px;">
+            <!-- Google -->
+            <button onclick="loginWithGoogle()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:14px;border:1.5px solid #e2e8f0;border-radius:12px;background:#fff;font-size:14px;font-weight:600;color:#1a1a2e;cursor:pointer;margin-bottom:10px;font-family:inherit;">
+                <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                Continuar con Google
+            </button>
+            <!-- Email -->
+            <button onclick="showEmailRegister()" class="btn-primary" style="margin-bottom:10px;">
+                Registrarse con Email
+            </button>
+            <!-- Ya tengo cuenta -->
+            <button onclick="showEmailLogin()" style="width:100%;padding:13px;border:none;background:none;font-size:14px;font-weight:500;color:#94a3b8;cursor:pointer;font-family:inherit;">
+                Ya tengo cuenta — Iniciar sesión
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<!-- ═══════════════════════════════
+     FILTROS — Bottom sheet
+══════════════════════════════════ -->
+<div id="filter-overlay" onclick="handleFilterOverlayClick(event)">
+    <div id="filter-sheet">
+        <div class="sheet-handle"></div>
+
+        <!-- Header filtros -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;">
+            <h2 style="font-size:17px;font-weight:700;color:#1a1a2e;">Filtros</h2>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <button onclick="resetFilters()" style="font-size:13px;font-weight:500;color:#94a3b8;background:none;border:none;cursor:pointer;">Limpiar todo</button>
+                <button onclick="closeFilters()" style="background:none;border:none;cursor:pointer;color:#6b7280;display:flex;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Precio -->
+        <div style="margin-bottom:22px;">
+            <p class="filter-label">Precio</p>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span id="price-label-min" style="font-size:13px;font-weight:600;color:var(--baltic);">S/ 0</span>
+                <span id="price-label-max" style="font-size:13px;font-weight:600;color:var(--baltic);">S/ 20,000+</span>
+            </div>
+            <div class="dual-range">
+                <div class="range-track-bg"></div>
+                <div id="range-fill"></div>
+                <input type="range" id="filter-price-min" min="0" max="20000" value="0" step="100"
+                    oninput="updatePriceSlider(this); applyFilters()">
+                <input type="range" id="filter-price-max" min="0" max="20000" value="20000" step="100"
+                    oninput="updatePriceSlider(this); applyFilters()">
+            </div>
+        </div>
+
+        <!-- Estado -->
+        <div style="margin-bottom:22px;">
+            <p class="filter-label">Estado</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <label class="cond-pill"><input type="checkbox" class="cond-cb" value="Nuevo" onchange="applyFilters()"><span>Nuevo</span></label>
+                <label class="cond-pill"><input type="checkbox" class="cond-cb" value="Como nuevo" onchange="applyFilters()"><span>Como nuevo</span></label>
+                <label class="cond-pill"><input type="checkbox" class="cond-cb" value="En buen estado" onchange="applyFilters()"><span>En buen estado</span></label>
+                <label class="cond-pill"><input type="checkbox" class="cond-cb" value="Usado" onchange="applyFilters()"><span>Usado</span></label>
+                <label class="cond-pill"><input type="checkbox" class="cond-cb" value="Con desgaste" onchange="applyFilters()"><span>Con desgaste</span></label>
+                <label class="cond-pill"><input type="checkbox" class="cond-cb" value="Para piezas" onchange="applyFilters()"><span>Para piezas</span></label>
+            </div>
+        </div>
+
+        <!-- Categoría -->
+        <div style="margin-bottom:22px;">
+            <p class="filter-label">Categoría</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <label class="cond-pill"><input type="checkbox" class="cat-cb" value="Electrónica" onchange="applyFilters()"><span>Electrónica</span></label>
+                <label class="cond-pill"><input type="checkbox" class="cat-cb" value="Ropa y Accesorios" onchange="applyFilters()"><span>Ropa y Accesorios</span></label>
+                <label class="cond-pill"><input type="checkbox" class="cat-cb" value="Hogar y Muebles" onchange="applyFilters()"><span>Hogar y Muebles</span></label>
+                <label class="cond-pill"><input type="checkbox" class="cat-cb" value="Deportes" onchange="applyFilters()"><span>Deportes</span></label>
+                <label class="cond-pill"><input type="checkbox" class="cat-cb" value="Vehículos" onchange="applyFilters()"><span>Vehículos</span></label>
+                <label class="cond-pill"><input type="checkbox" class="cat-cb" value="Libros" onchange="applyFilters()"><span>Libros</span></label>
+                <label class="cond-pill"><input type="checkbox" class="cat-cb" value="Instrumentos" onchange="applyFilters()"><span>Instrumentos</span></label>
+                <label class="cond-pill"><input type="checkbox" class="cat-cb" value="Juguetes" onchange="applyFilters()"><span>Juguetes</span></label>
+                <label class="cond-pill"><input type="checkbox" class="cat-cb" value="Otros" onchange="applyFilters()"><span>Otros</span></label>
+            </div>
+        </div>
+
+        <!-- Ubicación -->
+        <div style="margin-bottom:28px;">
+            <p class="filter-label">Ubicación</p>
+            <select id="filter-location" class="form-input" onchange="applyFilters()" style="background-color:#fff;">
+                <option value="">Todas las ubicaciones</option>
+                <option>Miraflores</option>
+                <option>San Isidro</option>
+                <option>Barranco</option>
+                <option>Surco</option>
+                <option>Lince</option>
+                <option>Jesús María</option>
+                <option>La Molina</option>
+                <option>Pueblo Libre</option>
+                <option>Magdalena del Mar</option>
+                <option>Lima Centro</option>
+            </select>
+        </div>
+
+        <!-- Botón ver resultados -->
+        <button onclick="closeFilters()" class="btn-primary">Ver resultados</button>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════
+     NAVBAR INFERIOR
+══════════════════════════════════ -->
+<nav id="bottom-nav">
+    <!-- Explorar -->
+    <button id="tab-home" class="active-tab" onclick="showTab('home')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Explorar
+    </button>
+    <!-- Guardados -->
+    <button id="tab-saved" onclick="showTab('saved')" style="position:relative;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+        Guardados
+        <span id="saved-badge" style="display:none;position:absolute;top:6px;right:calc(50% - 16px);min-width:16px;height:16px;background:var(--baltic);color:#fff;border-radius:99px;font-size:9px;font-weight:700;line-height:16px;text-align:center;padding:0 3px;"></span>
+    </button>
+    <!-- Mensajes -->
+    <button id="tab-messages" onclick="showTab('messages')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+        Mensajes
+    </button>
+    <!-- Perfil -->
+    <button id="tab-profile" onclick="showTab('profile')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+        Perfil
+    </button>
+</nav>
+
+<!-- ═══════════════════════════════
+     MODAL PUBLICAR OBJETO
+══════════════════════════════════ -->
+<div id="publish-overlay" onclick="handleOverlayClick(event)">
+    <div id="publish-sheet">
+        <div class="sheet-handle"></div>
+
+        <div class="flex items-center justify-between mb-5">
+            <h2 class="text-lg font-bold text-slate-900">Publicar objeto</h2>
+            <button onclick="closePublish()" class="text-slate-400 hover:text-slate-600">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Fotos -->
+        <div class="mb-5">
+            <label class="form-label">Fotos <span class="text-slate-400 font-normal">(máx. 8)</span></label>
+            <div id="photoPreviewArea">
+                <div id="addPhotoBtn" onclick="document.getElementById('photoInput').click()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Añadir
+                </div>
+            </div>
+            <input type="file" id="photoInput" accept="image/*" multiple style="display:none" onchange="handlePhotos(event)">
+        </div>
+
+        <!-- Nombre -->
+        <div class="mb-4">
+            <label class="form-label">Nombre del objeto</label>
+            <input type="text" id="pub-title" class="form-input" placeholder="Ej: iPhone 14 Pro Max 256GB">
+        </div>
+
+        <!-- Precio -->
+        <div class="mb-4">
+            <label class="form-label">Precio (S/)</label>
+            <input type="number" id="pub-price" class="form-input" placeholder="0.00" min="0">
+        </div>
+
+        <!-- Categoría -->
+        <div class="mb-4">
+            <label class="form-label">Categoría</label>
+            <select id="pub-category" class="form-input">
+                <option value="">Selecciona una categoría</option>
+                <option>Electrónica</option>
+                <option>Ropa y Accesorios</option>
+                <option>Hogar y Muebles</option>
+                <option>Deportes</option>
+                <option>Vehículos</option>
+                <option>Libros</option>
+                <option>Instrumentos</option>
+                <option>Juguetes</option>
+                <option>Otros</option>
+            </select>
+        </div>
+
+        <!-- Condición -->
+        <div class="mb-4">
+            <label class="form-label">Condición</label>
+            <div class="flex gap-2">
+                <button class="condition-btn flex-1 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600" data-val="Nuevo" onclick="selectCondition(this)">Nuevo</button>
+                <button class="condition-btn flex-1 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600" data-val="Como nuevo" onclick="selectCondition(this)">Como nuevo</button>
+                <button class="condition-btn flex-1 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600" data-val="Usado" onclick="selectCondition(this)">Usado</button>
+            </div>
+        </div>
+
+        <!-- Localización -->
+        <div class="mb-4">
+            <label class="form-label">Ubicación</label>
+            <input type="text" id="pub-location" class="form-input" placeholder="Ej: Miraflores, Lima">
+        </div>
+
+        <!-- Descripción -->
+        <div class="mb-6">
+            <label class="form-label">Descripción</label>
+            <textarea id="pub-desc" class="form-input" rows="4" placeholder="Describe el objeto: estado, características, motivo de venta..."></textarea>
+        </div>
+
+        <!-- Botón publicar -->
+        <button class="btn-primary" onclick="submitPublish()">Publicar objeto</button>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════
+     SCRIPT
+══════════════════════════════════ -->
+<script>
+/* ── DATOS ── */
+/* Cache en tiempo de ejecución — buildCard escribe aquí, openProduct lee aquí */
+const PRODUCTS = {};
+
+
+/* ══════════════════════════════════
+   SUPABASE — rellena tus credenciales
+══════════════════════════════════ */
+const SUPABASE_URL = 'https://kwejkzojjuxceogdihio.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_nUMr1CxBdqDMKux7MgpmIg_kJaZjppX';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: {
+        detectSessionInUrl: true,   // parsea #access_token=... del Magic Link
+        persistSession:     true,   // guarda la sesión en localStorage
+        autoRefreshToken:   true    // renueva el JWT antes de que expire
+    }
+});
+
+/* ── Estado ── */
+let isLoggedIn        = false;
+let currentUser       = null;
+let pendingAction     = null;
+let currentTab        = 'home';
+let currentChatId              = null;   // UUID del otro usuario en el chat activo
+let currentChatUser            = null;   // { id, name, avatar } del otro usuario
+let currentChatProductId       = null;   // DB id del producto que origina la conversación
+let currentChatProductPrice    = null;   // precio formateado del producto activo
+let currentChatProductSellerId = null;   // seller_id del producto (para determinar rol)
+let currentChatProductStatus   = null;   // status del producto activo ('available','reserved'…)
+let chatMessages         = [];     // mensajes del chat activo
+let chatSubscription     = null;   // canal realtime activo
+let selectedCondition = '';
+let publishPhotos     = [];
+let editingProductId  = null;   // DB id while editing; null when publishing new
+let authMode          = 'register';  // 'register' | 'login'
+let allProducts       = [];          // copia maestra para filtrado
+
+/* ── Listener reactivo de sesión ── */
+sb.auth.onAuthStateChange(function(event, session) {
+    console.log('[auth]', event, session ? session.user.email : 'no session');
+
+    if (session && session.user) {
+        isLoggedIn  = true;
+        currentUser = session.user;
+        applyUserToUI(session.user);   // resets avatar img, sets initial letter
+        fetchUserFavorites();
+
+        if (event === 'SIGNED_IN') {
+            loadProfile();   // fetch fresh avatar_url for this specific account
+            ensureProfileName(session.user); // sincroniza nombre del formulario → profiles
+            // Cubre tanto el login por formulario como la llegada desde Magic Link.
+            if (window.location.hash.includes('access_token')) {
+                history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+            if (document.getElementById('auth-view').classList.contains('active')) {
+                hideAuthView();
+            }
+            if (pendingAction) {
+                var action = pendingAction;
+                pendingAction = null;
+                action();
+            } else {
+                showTab('home');
+            }
+        }
+        // INITIAL_SESSION: página recargada, cargamos el perfil del usuario actual
+        if (event === 'INITIAL_SESSION') {
+            loadProfile();
+            ensureProfileName(session.user); // por si el upsert falló en el registro anterior
+        }
+    } else {
+        isLoggedIn  = false;
+        currentUser = null;
+        clearUserUI();         // wipe avatar and all profile fields immediately
+        favorites.clear();
+        updateSavedBadge();
+    }
+});
+
+/* ── Garantiza que profiles.username tenga el nombre del registro ── */
+function ensureProfileName(user) {
+    var meta = user.user_metadata || {};
+    var nameFromMeta = (meta.full_name || meta.name || '').trim();
+    if (!nameFromMeta) return;
+
+    sb.from('profiles')
+        .select('id, username')
+        .eq('id', user.id)
+        .maybeSingle()
+        .then(function(r) {
+            if (r.error) { console.error('[ensureProfileName] select FAILED', r.error); return; }
+            if (r.data && r.data.username) return; // ya tiene nombre guardado
+            // Sin fila o username vacío → escribir el nombre del formulario de registro
+            sb.from('profiles')
+                .upsert({ id: user.id, username: nameFromMeta }, { onConflict: 'id' })
+                .then(function(res) {
+                    if (res.error) { console.error('[ensureProfileName] upsert FAILED', res.error); return; }
+                    console.log('[ensureProfileName] OK — username guardado:', nameFromMeta);
+                    var el = document.getElementById('prof-username');
+                    if (el) el.value = nameFromMeta;
+                });
+        });
+}
+
+function applyUserToUI(user) {
+    // Always wipe avatar immediately — avoids phantom photo from previous session
+    var imgEl  = document.getElementById('avatarImg');
+    var initEl = document.getElementById('avatarInitial');
+    if (imgEl)  { imgEl.src = ''; imgEl.style.display = 'none'; }
+
+    var meta = user.user_metadata || {};
+    var name = meta.full_name || meta.name || user.email.split('@')[0];
+    var usernameEl = document.getElementById('prof-username');
+    if (usernameEl) usernameEl.value = name;   // always overwrite — not just if empty
+    if (initEl) initEl.textContent = name.charAt(0).toUpperCase();
+    var emailEl = document.getElementById('prof-email');
+    if (emailEl) emailEl.value = user.email || '';
+}
+
+function clearUserUI() {
+    var imgEl  = document.getElementById('avatarImg');
+    var initEl = document.getElementById('avatarInitial');
+    if (imgEl)  { imgEl.src = ''; imgEl.style.display = 'none'; }
+    if (initEl) { initEl.textContent = '?'; }
+
+    var avatarInp = document.getElementById('avatarInput');
+    if (avatarInp) avatarInp.value = '';
+
+    ['prof-username', 'prof-bio', 'prof-location', 'prof-email'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+}
+
+/* ══════════════════
+   ESTRELLAS
+══════════════════ */
+function renderStars(rating) {
+    if (!rating) return '';
+    var html = '';
+    for (var i = 1; i <= 5; i++) {
+        var full = rating >= i;
+        var half = !full && rating >= (i - 0.5);
+        var gradId = 'sg' + i;
+        var fill   = full ? '#f59e0b' : (half ? 'url(#' + gradId + ')' : 'none');
+        var stroke = (full || half) ? '#f59e0b' : '#d1d5db';
+        html += '<svg width="13" height="13" viewBox="0 0 24 24" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.8" stroke-linejoin="round">';
+        if (half) {
+            html += '<defs><linearGradient id="' + gradId + '" x1="0" y1="0" x2="1" y2="0">' +
+                    '<stop offset="55%" stop-color="#f59e0b"/><stop offset="55%" stop-color="transparent"/>' +
+                    '</linearGradient></defs>';
+        }
+        html += '<polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>';
+    }
+    return html;
+}
+
+/* ══════════════════
+   CARGA DE PERFIL
+══════════════════ */
+function loadProfile() {
+    if (!currentUser) return;
+
+    // Datos de auth como base inmediata
+    applyUserToUI(currentUser);
+
+    // Buscar fila en profiles
+    sb.from('profiles')
+        .select('username, bio, location, rating, sales_count, avatar_url')
+        .eq('id', currentUser.id)
+        .maybeSingle()
+        .then(function(result) {
+            var p = result.data || {};
+
+            // Username: DB > auth metadata > email prefix
+            var meta = currentUser.user_metadata || {};
+            var name = p.username || meta.full_name || meta.name || currentUser.email.split('@')[0];
+            var usernameEl = document.getElementById('prof-username');
+            if (usernameEl) usernameEl.value = name;
+
+            var initialEl = document.getElementById('avatarInitial');
+            if (initialEl) initialEl.textContent = name.charAt(0).toUpperCase();
+
+            // Avatar: always show initial first, then replace with photo if exists
+            if (initialEl) initialEl.style.display = 'block';
+            var imgEl = document.getElementById('avatarImg');
+            if (p.avatar_url) {
+                if (imgEl) {
+                    // Cache-buster: force browser to fetch fresh image for this session
+                    imgEl.src = p.avatar_url + '?t=' + Date.now();
+                    imgEl.style.display = 'block';
+                    if (initialEl) initialEl.style.display = 'none';
+                }
+            } else {
+                if (imgEl) { imgEl.src = ''; imgEl.style.display = 'none'; }
+            }
+
+            // Bio
+            var bioEl = document.getElementById('prof-bio');
+            if (bioEl) bioEl.value = p.bio || '';
+
+            // Location
+            var locEl = document.getElementById('prof-location');
+            if (locEl) locEl.value = p.location || '';
+
+            // Stars + rating
+            var starsEl  = document.getElementById('prof-stars');
+            var ratingEl = document.getElementById('prof-rating-num');
+            if (starsEl)  starsEl.innerHTML = p.rating ? renderStars(p.rating) : renderStars(0);
+            if (ratingEl) ratingEl.textContent = p.rating ? p.rating.toFixed(1) : 'Sin valoraciones';
+
+            // Sales count
+            var salesEl = document.getElementById('prof-sales');
+            if (salesEl) salesEl.textContent = p.sales_count ? '· ' + p.sales_count + ' ventas' : '';
+
+            // Member since
+            var sinceEl = document.getElementById('prof-since');
+            if (sinceEl) {
+                var sinceDate = currentUser.created_at;
+                sinceEl.textContent = sinceDate ? '· Desde ' + new Date(sinceDate).getFullYear() : '';
+            }
+
+            // Email
+            var emailEl = document.getElementById('prof-email');
+            if (emailEl) emailEl.value = currentUser.email || '';
+        });
+}
+
+/* ══════════════════
+   GUARD DE AUTH
+══════════════════ */
+function requireAuth(action) {
+    if (isLoggedIn) { action(); return; }
+    pendingAction = action;
+    showAuthView();
+}
+
+function showAuthView() {
+    document.querySelectorAll('.view').forEach(function(v) {
+        v.classList.remove('active');
+        v.style.display = 'none';
+    });
+    var av = document.getElementById('auth-view');
+    av.classList.add('active');
+    av.style.display = 'block';
+    document.getElementById('bottom-nav').style.display = 'none';
+    document.getElementById('email-form').style.display   = 'none';
+    document.getElementById('auth-buttons').style.display = '';
+    document.getElementById('auth-subtitle').textContent  = 'Únete a la comunidad de Lince y compra o vende cerca de ti';
+    setAuthLoading(false);
+    showAuthError('');
+}
+
+function hideAuthView() {
+    var av = document.getElementById('auth-view');
+    av.classList.remove('active');
+    av.style.display = 'none';
+    document.getElementById('bottom-nav').style.display = 'flex';
+    document.querySelectorAll('.view').forEach(function(v) { v.style.display = ''; });
+}
+
+function setAuthLoading(on) {
+    var btn = document.getElementById('btn-do-login');
+    if (!btn) return;
+    btn.disabled      = on;
+    btn.textContent   = on ? 'Cargando...' : (authMode === 'register' ? 'Crear cuenta y entrar' : 'Entrar');
+    btn.style.opacity = on ? '.6' : '1';
+}
+
+function showAuthError(msg) {
+    var el = document.getElementById('auth-error');
+    if (!el) return;
+    el.textContent     = msg;
+    el.style.display   = msg ? '' : 'none';
+}
+
+/* ── Flujos de UI ── */
+function showEmailRegister() {
+    authMode = 'register';
+    document.getElementById('auth-buttons').style.display  = 'none';
+    document.getElementById('email-form').style.display    = '';
+    document.getElementById('email-form-title').textContent = 'Crear cuenta';
+    document.getElementById('field-name').style.display    = '';
+    document.getElementById('btn-do-login').textContent    = 'Crear cuenta y entrar';
+    document.getElementById('auth-subtitle').textContent   = 'Completa tus datos para empezar';
+    document.getElementById('auth-switch-link').innerHTML  =
+        '¿Ya tienes cuenta? <span onclick="switchToLogin()" style="color:var(--baltic);font-weight:600;cursor:pointer;">Inicia sesión</span>';
+    showAuthError('');
+}
+
+function showEmailLogin() {
+    authMode = 'login';
+    document.getElementById('auth-buttons').style.display  = 'none';
+    document.getElementById('email-form').style.display    = '';
+    document.getElementById('email-form-title').textContent = 'Iniciar sesión';
+    document.getElementById('field-name').style.display    = 'none';
+    document.getElementById('btn-do-login').textContent    = 'Entrar';
+    document.getElementById('auth-subtitle').textContent   = 'Bienvenido de nuevo';
+    document.getElementById('auth-switch-link').innerHTML  =
+        '¿No tienes cuenta? <span onclick="switchToRegister()" style="color:var(--baltic);font-weight:600;cursor:pointer;">Regístrate gratis</span>';
+    showAuthError('');
+}
+
+function switchToLogin()    { showEmailLogin(); }
+function switchToRegister() { showEmailRegister(); }
+
+/* ── Volver en auth ── */
+function goBackFromAuth() {
+    var emailForm   = document.getElementById('email-form');
+    var authButtons = document.getElementById('auth-buttons');
+    if (emailForm.style.display !== 'none') {
+        // Estamos en el formulario → volver a los botones principales
+        emailForm.style.display   = 'none';
+        authButtons.style.display = '';
+        document.getElementById('auth-subtitle').textContent = 'Únete a la comunidad de Lince y compra o vende cerca de ti';
+        showAuthError('');
+    } else {
+        // Estamos en los botones → cerrar auth y volver a home
+        pendingAction = null;
+        hideAuthView();
+        showTab('home');
+    }
+}
+
+/* ── Acción del botón principal ── */
+function doLogin() {
+    var email = document.getElementById('auth-email').value.trim();
+    var pass  = document.getElementById('auth-pass').value.trim();
+
+    if (!email || !pass) {
+        var form = document.getElementById('email-form');
+        form.classList.add('auth-shake');
+        setTimeout(function() { form.classList.remove('auth-shake'); }, 400);
+        showAuthError('Rellena el correo y la contraseña.');
+        return;
+    }
+
+    setAuthLoading(true);
+    showAuthError('');
+
+    if (authMode === 'register') {
+        var name = (document.getElementById('auth-name').value || '').trim() || email.split('@')[0];
+        sb.auth.signUp({
+            email: email,
+            password: pass,
+            options: { data: { full_name: name } }
+        }).then(function(result) {
+            setAuthLoading(false);
+            if (result.error) {
+                showAuthError(result.error.message);
+            } else if (result.data.user && !result.data.session) {
+                // Supabase requiere confirmar el email
+                document.getElementById('email-form').innerHTML =
+                    '<div style="text-align:center;padding:24px 0;">' +
+                        '<div style="font-size:40px;margin-bottom:14px;">📬</div>' +
+                        '<p style="font-size:16px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">Confirma tu correo</p>' +
+                        '<p style="font-size:13px;color:#6b7280;line-height:1.6;">Hemos enviado un enlace a <strong>' + email + '</strong>.<br>Ábrelo para activar tu cuenta.</p>' +
+                    '</div>';
+            }
+            // Si hay sesión directa → onAuthStateChange lo maneja
+        });
+    } else {
+        sb.auth.signInWithPassword({ email: email, password: pass }).then(function(result) {
+            setAuthLoading(false);
+            if (result.error) {
+                showAuthError(result.error.message === 'Invalid login credentials'
+                    ? 'Correo o contraseña incorrectos.'
+                    : result.error.message);
+            }
+            // Login OK → onAuthStateChange lo maneja
+        });
+    }
+}
+
+/* ── Google OAuth ── */
+function loginWithGoogle() {
+    sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.href }
+    });
+}
+
+/* ══════════════════
+   TABS
+══════════════════ */
+function showTab(tab) {
+    // Estas vistas requieren login
+    if ((tab === 'messages' || tab === 'profile' || tab === 'saved') && !isLoggedIn) {
+        requireAuth(function() { showTab(tab); });
+        return;
+    }
+    ['home-view','saved-view','messages-view','profile-view'].forEach(function(id) {
+        document.getElementById(id).classList.remove('active');
+    });
+    ['tab-home','tab-saved','tab-messages','tab-profile'].forEach(function(id) {
+        document.getElementById(id).classList.remove('active-tab');
+    });
+    currentTab = tab;
+    document.getElementById(tab + '-view').classList.add('active');
+    document.getElementById('tab-' + tab).classList.add('active-tab');
+    if (tab === 'messages') loadConversations();
+    if (tab === 'profile')  loadProfile();
+    if (tab === 'saved')    loadFavorites();
+}
+
+/* ══════════════════
+   PRODUCTO
+══════════════════ */
+function openProduct(id) {
+    var p = PRODUCTS[id];
+    if (!p) return;
+    var stars    = '★'.repeat(Math.round(p.rating)) + '☆'.repeat(5 - Math.round(p.rating));
+    var init     = p.seller.charAt(0).toUpperCase();
+    var sellerAv = p.seller_avatar_url
+        ? '<img src="' + p.seller_avatar_url + '" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+          '<div style="display:none;width:44px;height:44px;border-radius:50%;background:var(--baltic);align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px;flex-shrink:0;">' + init + '</div>'
+        : '<div style="width:44px;height:44px;border-radius:50%;background:var(--baltic);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px;flex-shrink:0;">' + init + '</div>';
+
+    document.getElementById('productViewTitle').textContent = p.title;
+    document.getElementById('productViewContent').innerHTML =
+        '<img src="' + p.image + '" alt="' + p.title + '" class="w-full" style="height:280px;object-fit:cover;">' +
+        '<div class="px-5 py-5 space-y-4">' +
+            '<div>' +
+                '<p class="text-3xl font-extrabold" style="color:var(--baltic);">' + p.price + '</p>' +
+                '<h1 class="text-lg font-bold text-slate-900 mt-1">' + p.title + '</h1>' +
+                '<p style="font-size:12px;color:#b0b5bf;margin-top:4px;font-weight:400;">' + p.location + '</p>' +
+            '</div>' +
+            '<div class="bg-slate-50 rounded-xl p-4">' +
+                '<p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Descripción</p>' +
+                '<p class="text-sm text-slate-600 leading-relaxed">' + p.desc + '</p>' +
+            '</div>' +
+            '<div class="bg-slate-50 rounded-xl p-4 flex items-center gap-3">' +
+                sellerAv +
+                '<div>' +
+                    '<p class="font-semibold text-slate-900 text-sm">' + p.seller + '</p>' +
+                    '<p class="stars text-sm">' + stars + ' <span class="text-slate-400 text-xs font-normal">' + p.rating + ' (' + p.reviews + ' reseñas)</span></p>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+
+    // Sticky action bar — role-based buttons
+    var isOwner = isLoggedIn && currentUser && p.seller_id === currentUser.id;
+    var bar = document.getElementById('productActionBar');
+    if (isOwner) {
+        bar.innerHTML =
+            '<button class="btn-primary" style="flex:1;" onclick="openEdit(\'' + id + '\')">Editar producto</button>' +
+            '<button onclick="deleteProduct(\'' + id + '\')" style="width:46px;height:46px;border-radius:12px;border:none;background:#fee2e2;color:#dc2626;font-size:18px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;">🗑️</button>';
+    } else {
+        bar.innerHTML =
+            '<button class="btn-outline" style="flex:1;" onclick="openHaggle(\'' + id + '\')">Regatear</button>' +
+            '<button class="btn-primary" style="flex:1;" onclick="openChatFromProduct(\'' + id + '\')">Escribir</button>';
+    }
+    bar.classList.add('open');
+
+    document.getElementById('product-view').classList.add('active');
+    document.getElementById('bottom-nav').style.display = 'none';
+}
+
+function closeProduct() {
+    document.getElementById('product-view').classList.remove('active');
+    document.getElementById('productActionBar').classList.remove('open');
+    document.getElementById('bottom-nav').style.display = 'flex';
+}
+
+function deleteProduct(id) {
+    var p = PRODUCTS[id];
+    if (!p || !p.db_id) return;
+    if (!confirm('¿Eliminar este anuncio? Esta acción no se puede deshacer.')) return;
+
+    sb.from('products')
+        .delete()
+        .eq('id', p.db_id)
+        .eq('seller_id', currentUser.id)   // RLS doble: solo el dueño
+        .then(function(result) {
+            if (result.error) {
+                alert('Error al borrar: ' + result.error.message);
+                return;
+            }
+            delete PRODUCTS[id];
+            closeProduct();
+            fetchProducts();   // refresca la home
+        });
+}
+
+/* ══════════════════
+   CHAT
+══════════════════ */
+/* ── Helpers ── */
+function escapeHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function formatRelTime(iso) {
+    if (!iso) return '';
+    var d = new Date(iso), diff = Date.now() - d;
+    if (diff < 60000)     return 'Ahora';
+    if (diff < 3600000)   return Math.floor(diff / 60000) + ' min';
+    if (diff < 86400000)  return Math.floor(diff / 3600000) + 'h';
+    if (diff < 604800000) return Math.floor(diff / 86400000) + 'd';
+    return d.toLocaleDateString('es-PE', { day: 'numeric', month: 'short' });
+}
+function avatarDataUrl(name) {
+    var i = (name || '?').charAt(0).toUpperCase();
+    return 'data:image/svg+xml,' + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48">' +
+        '<rect width="48" height="48" rx="24" fill="#006994"/>' +
+        '<text x="24" y="31" text-anchor="middle" font-family="Inter,Arial,sans-serif"' +
+        ' font-weight="700" font-size="18" fill="#fff">' + i + '</text></svg>');
+}
+
+/* ══════════════════
+   CHAT INDIVIDUAL
+══════════════════ */
+function openChat(otherId, otherName, otherAvatar, productId, productTitle, productImg, productPrice, productSellerId, productStatus) {
+    if (!isLoggedIn) {
+        requireAuth(function() { openChat(otherId, otherName, otherAvatar, productId, productTitle, productImg, productPrice, productSellerId, productStatus); });
+        return;
+    }
+    if (!otherId) return;
+    if (otherId === currentUser.id) { alert('Este es tu propio anuncio.'); return; }
+
+    currentChatId              = otherId;
+    currentChatProductId       = productId       || null;
+    currentChatProductPrice    = productPrice    || null;
+    currentChatProductSellerId = productSellerId || null;
+    currentChatProductStatus   = productStatus   || 'available';
+    currentChatUser            = { id: otherId, name: otherName || 'Usuario', avatar: otherAvatar || '' };
+    chatMessages               = [];
+
+    // Nav bar
+    var avatarEl = document.getElementById('chatAvatar');
+    avatarEl.src = otherAvatar || avatarDataUrl(otherName);
+    avatarEl.onerror = function() { this.src = avatarDataUrl(otherName); };
+    document.getElementById('chatName').textContent = otherName || 'Usuario';
+
+    // Product header card
+    var hdr = document.getElementById('chatProductHeader');
+    if (productId && productTitle) {
+        document.getElementById('chatProdImg').src           = productImg  || '';
+        document.getElementById('chatProdPrice').textContent = productPrice || '';
+        document.getElementById('chatProdTitle').textContent = productTitle;
+
+        // Seller mini-row (avatar + name in header)
+        var sellerRow = document.getElementById('chatProdSellerRow');
+        var sellerAvatarEl = document.getElementById('chatProdSellerAvatar');
+        var sellerNameEl   = document.getElementById('chatProdSellerName');
+        // otherAvatar is the person we're chatting with; if they're the seller it's their avatar
+        var sellerIsOther = productSellerId && productSellerId !== (currentUser && currentUser.id);
+        if (otherAvatar && sellerIsOther) {
+            sellerAvatarEl.src = otherAvatar;
+            sellerAvatarEl.style.display = 'block';
+        } else {
+            sellerAvatarEl.style.display = 'none';
+        }
+        sellerNameEl.textContent = sellerIsOther ? (otherName || '') : '';
+        sellerRow.style.display = sellerIsOther ? 'flex' : 'none';
+
+        // Renderizar botones según rol + estado del producto
+        var amSeller = !!(productSellerId && currentUser && productSellerId === currentUser.id);
+        renderChatProductButtons(amSeller, currentChatProductStatus);
+
+        hdr.classList.add('visible');
+    } else {
+        hdr.classList.remove('visible');
+    }
+
+    var container = document.getElementById('messagesContainer');
+    container.innerHTML = '<p style="text-align:center;padding:40px 0;font-size:13px;color:#b0b5bf;">Cargando…</p>';
+
+    document.getElementById('chat-view').classList.add('active');
+    document.getElementById('bottom-nav').style.display = 'none';
+
+    loadChatMessages(otherId, productId || null);
+}
+
+function loadChatMessages(otherId, productId) {
+    var me = currentUser.id;
+    var query = sb.from('messages')
+        .select('id, sender_id, content, created_at, read')
+        .or('and(sender_id.eq.' + me + ',receiver_id.eq.' + otherId + '),and(sender_id.eq.' + otherId + ',receiver_id.eq.' + me + ')')
+        .order('created_at', { ascending: true });
+
+    if (productId) query = query.eq('product_id', productId);
+
+    query.then(function(r) {
+        if (r.error) {
+            console.error('[loadChatMessages] FAILED — code:', r.error.code,
+                '| message:', r.error.message, '| full:', r.error);
+        }
+        chatMessages = r.data || [];
+        renderMessages(chatMessages);
+        markMessagesAsRead(otherId, productId);
+    });
+
+    // Realtime — canal global de mensajes con filtros por usuario
+    if (chatSubscription) { try { sb.removeChannel(chatSubscription); } catch(e) {} chatSubscription = null; }
+    try {
+        chatSubscription = sb.channel('public:messages')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages',
+                filter: 'receiver_id=eq.' + me }, function(payload) {
+                    var match = payload.new.sender_id === otherId &&
+                                (!productId || payload.new.product_id === productId);
+                    if (match) {
+                        chatMessages.push(payload.new);
+                        renderMessages(chatMessages);
+                        markMessagesAsRead(otherId, productId);
+                    }
+                })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages',
+                filter: 'sender_id=eq.' + me }, function(payload) {
+                    var updated = payload.new;
+                    if (!productId || updated.product_id === productId) {
+                        var idx = chatMessages.findIndex(function(m) { return m.id === updated.id; });
+                        if (idx !== -1) {
+                            chatMessages[idx] = Object.assign({}, chatMessages[idx], { read: updated.read });
+                            renderMessages(chatMessages);
+                        }
+                    }
+                })
+            .subscribe();
+    } catch(e) {}
+}
+
+function closeChat() {
+    document.getElementById('chat-view').classList.remove('active');
+    document.getElementById('bottom-nav').style.display = 'flex';
+    if (chatSubscription) { try { sb.removeChannel(chatSubscription); } catch(e) {} chatSubscription = null; }
+    currentChatId = null; currentChatUser = null;
+    currentChatProductId = null; currentChatProductPrice = null;
+    currentChatProductSellerId = null; currentChatProductStatus = null;
+    chatMessages = [];
+    document.getElementById('chatProductHeader').classList.remove('visible');
+}
+
+/* ── Renderiza los botones del header de producto según rol y estado ── */
+function renderChatProductButtons(amSeller, status) {
+    var sellerDiv = document.getElementById('chatProdSellerBtns');
+    var buyerDiv  = document.getElementById('chatProdBuyerBtns');
+    var isReserved = status === 'reserved';
+
+    if (amSeller) {
+        buyerDiv.style.display  = 'none';
+        sellerDiv.style.display = 'flex';
+        if (isReserved) {
+            sellerDiv.innerHTML =
+                '<button class="chat-prod-btn" onclick="unreserveProduct()" ' +
+                    'style="border:1.5px solid #d97706;color:#d97706;background:#fff;">' +
+                    'Deshacer reserva' +
+                '</button>' +
+                '<button class="chat-prod-btn" onclick="markAsSold()" ' +
+                    'style="border:none;background:#16a34a;color:#fff;">' +
+                    'Vendido' +
+                '</button>';
+        } else {
+            sellerDiv.innerHTML =
+                '<button class="chat-prod-btn" onclick="reserveProduct()" ' +
+                    'style="border:1.5px solid var(--baltic);color:var(--baltic);background:#fff;">' +
+                    'Reservar' +
+                '</button>' +
+                '<button class="chat-prod-btn" onclick="markAsSold()" ' +
+                    'style="border:none;background:#16a34a;color:#fff;">' +
+                    'Vendido' +
+                '</button>';
+        }
+    } else {
+        sellerDiv.style.display = 'none';
+        buyerDiv.style.display  = 'flex';
+        if (isReserved) {
+            buyerDiv.innerHTML =
+                '<div style="flex:1;text-align:center;padding:9px 6px;border-radius:10px;' +
+                    'background:#fefce8;border:1.5px solid #D4AF37;font-size:12.5px;' +
+                    'font-weight:700;color:#92400e;letter-spacing:.02em;">' +
+                    'Producto apalabrado' +
+                '</div>';
+        } else {
+            buyerDiv.innerHTML =
+                '<button class="chat-prod-btn" onclick="openOfferModal()" ' +
+                    'style="border:1.5px solid var(--baltic);color:var(--baltic);background:#fff;">' +
+                    'Regatear' +
+                '</button>' +
+                '<button class="chat-prod-btn" onclick="sendMeetingMessage()" ' +
+                    'style="border:none;background:var(--baltic);color:#fff;">' +
+                    'Pactar encuentro' +
+                '</button>';
+        }
+    }
+}
+
+/* ── Actualiza el status del producto activo en UI + catálogo ── */
+function updateChatProductStatus(newStatus) {
+    currentChatProductStatus = newStatus;
+    var amSeller = !!(currentChatProductSellerId && currentUser &&
+                      currentChatProductSellerId === currentUser.id);
+    renderChatProductButtons(amSeller, newStatus);
+    fetchProducts();
+}
+
+/* ── Product header actions ── */
+function openOfferModal() {
+    var title = document.getElementById('chatProdTitle').textContent;
+    document.getElementById('offerProductLabel').textContent = title ? '"' + title + '"' : '';
+    document.getElementById('offerPriceInput').value = '';
+    document.getElementById('offerModal').classList.add('open');
+    setTimeout(function() { document.getElementById('offerPriceInput').focus(); }, 80);
+}
+
+function closeOfferModal() {
+    document.getElementById('offerModal').classList.remove('open');
+}
+
+function submitOffer() {
+    var priceRaw = document.getElementById('offerPriceInput').value.trim();
+    if (!priceRaw || isNaN(Number(priceRaw)) || Number(priceRaw) <= 0) {
+        document.getElementById('offerPriceInput').focus();
+        return;
+    }
+    var title = document.getElementById('chatProdTitle').textContent;
+    var text  = 'Te hago una oferta de S/ ' + Number(priceRaw).toLocaleString('es-PE') +
+                (title ? ' por "' + title + '"' : '') + '. ¿Lo aceptas?';
+    closeOfferModal();
+    document.getElementById('messageInput').value = text;
+    sendMessage();
+}
+
+function sendMeetingMessage() {
+    var title = document.getElementById('chatProdTitle').textContent;
+    var text  = '¡Hola! Me interesa' + (title ? ' "' + title + '"' : ' el producto') +
+                '. ¿Cuándo y dónde podemos quedar para el intercambio?';
+    document.getElementById('messageInput').value = text;
+    sendMessage();
+}
+
+function reserveProduct() {
+    var title = document.getElementById('chatProdTitle').textContent;
+    var buyer = currentChatUser ? currentChatUser.name : 'ti';
+    var text  = 'He reservado "' + (title || 'el producto') + '" para ' + buyer + '. Avísame cuando quieras cerrar la venta.';
+    document.getElementById('messageInput').value = text;
+    sendMessage();
+
+    if (currentChatProductId && currentUser) {
+        sb.from('products')
+            .update({ status: 'reserved' })
+            .eq('id', currentChatProductId)
+            .eq('seller_id', currentUser.id)
+            .then(function(r) {
+                if (r.error) { console.error('[reserveProduct] FAILED', r.error); return; }
+                updateChatProductStatus('reserved');
+            });
+    }
+}
+
+function unreserveProduct() {
+    if (!currentChatProductId || !currentUser) return;
+    sb.from('products')
+        .update({ status: 'available' })
+        .eq('id', currentChatProductId)
+        .eq('seller_id', currentUser.id)
+        .then(function(r) {
+            if (r.error) { console.error('[unreserveProduct] FAILED', r.error); return; }
+            updateChatProductStatus('available');
+        });
+}
+
+function markAsSold() {
+    var title = document.getElementById('chatProdTitle').textContent || 'el producto';
+    if (!confirm('¿Marcar "' + title + '" como vendido? Se eliminará de la tienda.')) return;
+    if (!currentChatProductId || !currentUser) return;
+
+    sb.from('products').delete()
+        .eq('id', currentChatProductId)
+        .eq('seller_id', currentUser.id)
+        .then(function(r) {
+            if (r.error) { console.error('[markAsSold] FAILED', r.error); return; }
+            // Notify the buyer via chat
+            var text = '¡Trato hecho! He marcado "' + title + '" como vendido. ¡Gracias por la compra!';
+            document.getElementById('messageInput').value = text;
+            sendMessage();
+            // Hide the header card and refresh listings
+            document.getElementById('chatProductHeader').classList.remove('visible');
+            fetchProducts();
+        });
+}
+
+function useQuickReply(text) {
+    var input = document.getElementById('messageInput');
+    input.value = text;
+    input.focus();
+}
+
+function openChatFromProduct(productId) {
+    var p = PRODUCTS[productId];
+    closeProduct();
+    if (!p || !p.seller_id) { alert('No se puede iniciar chat con este vendedor.'); return; }
+    openChat(p.seller_id, p.seller, p.seller_avatar_url || null, p.db_id, p.title, p.image, p.price, p.seller_id, p.status || 'available');
+    setTimeout(function() {
+        var input = document.getElementById('messageInput');
+        if (input && !input.value) {
+            input.value = 'Hola, ¿sigue disponible? Me interesa comprarlo.';
+        }
+    }, 50);
+}
+
+function openHaggle(productId) {
+    var p = PRODUCTS[productId];
+    closeProduct();
+    if (!p || !p.seller_id) return;
+    openChat(p.seller_id, p.seller, p.seller_avatar_url || null, p.db_id, p.title, p.image, p.price, p.seller_id, p.status || 'available');
+    setTimeout(function() {
+        document.getElementById('messageInput').value =
+            'Hola! Vi tu ' + p.title + '. ¿Me lo dejas en ' + p.price + ' con envío incluido?';
+    }, 100);
+}
+
+/* ── Tick SVGs ── */
+function tickSvg(isDouble) {
+    if (isDouble) {
+        return '<svg width="15" height="9" viewBox="0 0 18 11" fill="none" style="display:inline-block;vertical-align:middle;flex-shrink:0;">' +
+            '<path d="M1 6l3.5 3.5L12 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="M6 6l3.5 3.5L17 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '</svg>';
+    }
+    return '<svg width="11" height="9" viewBox="0 0 13 11" fill="none" style="display:inline-block;vertical-align:middle;flex-shrink:0;">' +
+        '<path d="M1 6l3.5 3.5L11 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '</svg>';
+}
+
+function clockSvg() {
+    return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block;vertical-align:middle;flex-shrink:0;">' +
+        '<circle cx="12" cy="12" r="10"/><path stroke-linecap="round" d="M12 6v6l4 2"/>' +
+        '</svg>';
+}
+
+function markMessagesAsRead(otherId, productId) {
+    if (!currentUser || !otherId) {
+        console.warn('[markAsRead] Saltado — currentUser:', !!currentUser, '| otherId:', otherId);
+        return;
+    }
+    console.log('[markAsRead] Intentando marcar como leído... | otherId:', otherId, '| productId:', productId || 'ninguno');
+
+    var query = sb.from('messages')
+        .update({ read: true })
+        .eq('sender_id', otherId)
+        .eq('receiver_id', currentUser.id)
+        .eq('read', false);
+    if (productId) query = query.eq('product_id', productId);
+
+    query.select('id').then(function(r) {
+        if (r.error) {
+            console.error('[markAsRead] FAILED — code:', r.error.code,
+                '| message:', r.error.message, '| hint:', r.error.hint || '');
+            return;
+        }
+        var n = (r.data || []).length;
+        console.log('[markAsRead] OK —', n, 'mensaje(s) marcados como leídos');
+        // Actualizar array local para reflejar el cambio sin esperar al Realtime del remitente
+        chatMessages.forEach(function(m) {
+            if (m.sender_id === otherId && !m.read &&
+                (!productId || m.product_id === productId)) {
+                m.read = true;
+            }
+        });
+    });
+}
+
+function renderMessages(messages) {
+    var container = document.getElementById('messagesContainer');
+    container.innerHTML = '';
+    if (!messages || messages.length === 0) {
+        container.innerHTML = '<p style="text-align:center;padding:32px 0;font-size:13px;color:#b0b5bf;">Di hola 👋</p>';
+        return;
+    }
+    messages.forEach(function(msg) {
+        var isMe  = msg.sender_id === (currentUser && currentUser.id);
+        var text  = escapeHtml(msg.content || '');
+        var time  = formatRelTime(msg.created_at);
+        var wrap  = document.createElement('div');
+        wrap.className = 'flex ' + (isMe ? 'justify-end' : 'justify-start');
+        var bubble = document.createElement('div');
+        bubble.className = 'max-w-xs px-4 py-2 ' + (isMe ? 'bubble-me' : 'bubble-other');
+        var statusHtml = '';
+        if (isMe) {
+            if (msg.id === '_pending') {
+                statusHtml = '<span class="message-status">' + clockSvg() + '</span>';
+            } else if (msg.read) {
+                statusHtml = '<span class="message-status read">' + tickSvg(true) + '</span>';
+            } else {
+                statusHtml = '<span class="message-status">' + tickSvg(false) + '</span>';
+            }
+        }
+        bubble.innerHTML =
+            '<p class="text-sm" style="word-break:break-word;">' + text + '</p>' +
+            '<span class="text-xs mt-0.5 flex items-center gap-1' + (isMe ? ' justify-end' : '') + '">' +
+                '<span style="opacity:0.55">' + time + '</span>' + statusHtml +
+            '</span>';
+        wrap.appendChild(bubble);
+        container.appendChild(wrap);
+    });
+    container.scrollTop = container.scrollHeight;
+}
+
+function sendMessage() {
+    if (!currentChatId || !currentUser) return;
+    var input = document.getElementById('messageInput');
+    var text  = input.value.trim();
+    if (!text) return;
+    input.value = '';
+
+    // Render optimista
+    var optimistic = { id: '_pending', sender_id: currentUser.id, content: text, created_at: new Date().toISOString(), read: false };
+    chatMessages.push(optimistic);
+    renderMessages(chatMessages);
+
+    var msgPayload = {
+        sender_id:   currentUser.id,
+        receiver_id: currentChatId,
+        content:     text
+    };
+    if (currentChatProductId) msgPayload.product_id = currentChatProductId;
+
+    sb.from('messages').insert(msgPayload).select().single().then(function(r) {
+        if (r.error) {
+            console.error('[sendMessage] FAILED — code:', r.error.code,
+                '| message:', r.error.message, '| full:', r.error);
+        }
+        // Reemplazar el optimista con la fila real
+        var idx = chatMessages.findIndex(function(m) { return m.id === '_pending'; });
+        if (idx !== -1) {
+            chatMessages[idx] = r.error ? optimistic : r.data;
+        }
+        renderMessages(chatMessages);
+    });
+}
+
+document.getElementById('messageInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') sendMessage();
+});
+
+/* ══════════════════
+   LISTA DE CONVERSACIONES
+══════════════════ */
+function loadConversations() {
+    if (!currentUser) return;
+    var list = document.getElementById('chatList');
+    list.innerHTML = '<p style="text-align:center;padding:48px 0;font-size:13px;color:#b0b5bf;">Cargando…</p>';
+
+    sb.from('messages')
+        .select('id, sender_id, receiver_id, content, created_at, product_id, read')
+        .or('sender_id.eq.' + currentUser.id + ',receiver_id.eq.' + currentUser.id)
+        .order('created_at', { ascending: false })
+        .then(function(r) {
+            if (r.error) {
+                console.error('[loadConversations] messages query FAILED', r.error);
+                renderConversationsEmpty(); return;
+            }
+            if (!r.data || r.data.length === 0) {
+                renderConversationsEmpty(); return;
+            }
+            // Deduplicar por (otherId + productId) — una entrada por conversación/producto
+            // Contar no leídos en una sola pasada sobre todos los mensajes
+            var seen = {}, convos = [], unreadMap = {};
+            r.data.forEach(function(msg) {
+                var otherId = msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id;
+                var key     = otherId + '_' + (msg.product_id || 'none');
+                // Acumular mensajes que yo recibí y no he leído aún
+                if (msg.receiver_id === currentUser.id && !msg.read) {
+                    unreadMap[key] = (unreadMap[key] || 0) + 1;
+                }
+                if (!seen[key]) {
+                    seen[key] = true;
+                    convos.push({
+                        otherId:       otherId,
+                        productId:     msg.product_id || null,
+                        preview:       msg.content,
+                        time:          formatRelTime(msg.created_at),
+                        lastSenderIsMe: msg.sender_id === currentUser.id,
+                        unread:        0
+                    });
+                }
+            });
+            // Asignar conteo de no leídos a cada conversación
+            convos.forEach(function(c) {
+                c.unread = unreadMap[c.otherId + '_' + (c.productId || 'none')] || 0;
+            });
+
+            // Perfiles de los otros usuarios
+            var otherIds   = convos.map(function(c) { return c.otherId; });
+            var productIds = convos.map(function(c) { return c.productId; }).filter(Boolean);
+
+            var profilePromise = sb.from('profiles').select('id, username, avatar_url').in('id', otherIds);
+            var productPromise = productIds.length
+                ? sb.from('products').select('id, title, image_url, price, seller_id, status').in('id', productIds)
+                : Promise.resolve({ data: [] });
+
+            Promise.all([profilePromise, productPromise]).then(function(results) {
+                var pr = results[0], prod = results[1];
+                if (pr.error)   console.error('[loadConversations] profiles query FAILED', pr.error);
+                if (prod.error) console.error('[loadConversations] products query FAILED', prod.error);
+                var profileMap = {}, productMap = {};
+                (pr.data   || []).forEach(function(p) { profileMap[p.id] = p; });
+                (prod.data || []).forEach(function(p) { productMap[p.id] = p; });
+                renderConversationList(convos, profileMap, productMap);
+            });
+        });
+}
+
+function renderConversationList(convos, profileMap, productMap) {
+    var list = document.getElementById('chatList');
+    list.innerHTML = '';
+    convos.forEach(function(c) {
+        var prof    = (profileMap && profileMap[c.otherId])   || {};
+        var prod    = (productMap && productMap[c.productId]) || {};
+        var name    = prof.username || ('Usuario #' + c.otherId.slice(0, 6));
+        var avatar  = prof.avatar_url || avatarDataUrl(name);
+        var prodTitle    = prod.title     || null;
+        var prodImg      = prod.image_url || null;
+        var prodPrice    = prod.price != null ? 'S/ ' + Number(prod.price).toLocaleString('es-PE') : null;
+        var prodSellerId = prod.seller_id || null;
+
+        // Swipe wrapper
+        var wrapper = document.createElement('div');
+        wrapper.className = 'swipe-wrapper';
+        wrapper.innerHTML =
+            '<div class="swipe-bg">' +
+                '<svg class="swipe-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">' +
+                    '<path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18"/>' +
+                    '<path stroke-linecap="round" stroke-linejoin="round" d="M8 6V4h8v2"/>' +
+                    '<path stroke-linecap="round" stroke-linejoin="round" d="M19 6l-1 14H6L5 6"/>' +
+                    '<path stroke-linecap="round" stroke-linejoin="round" d="M10 11v6M14 11v6"/>' +
+                '</svg>' +
+            '</div>';
+
+        // Content row
+        var item = document.createElement('div');
+        item.className = 'swipe-item flex items-center gap-3 px-5 py-4';
+        var hasUnread    = c.unread > 0;
+        var unreadLabel  = c.unread > 99 ? '99+' : String(c.unread);
+        var previewColor = hasUnread ? '#1a1a2e' : '#94a3b8';
+        var previewWeight= hasUnread ? '500'     : '400';
+        var previewText  = (c.lastSenderIsMe ? 'Tú: ' : '') + (c.preview || '');
+
+        item.innerHTML =
+            // Avatar
+            '<div class="relative flex-shrink-0">' +
+                '<img src="' + avatar + '" alt="" class="w-12 h-12 rounded-full object-cover"' +
+                    ' onerror="this.src=\'' + avatarDataUrl(name) + '\'">' +
+            '</div>' +
+            '<div class="flex-1 min-w-0">' +
+                '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">' +
+                    '<p class="font-semibold text-slate-900 text-sm truncate">' + escapeHtml(name) + '</p>' +
+                    // Columna derecha: hora + badge
+                    '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">' +
+                        '<span style="font-size:11px;color:#b0b5bf;white-space:nowrap;">' + c.time + '</span>' +
+                        (hasUnread
+                            ? '<span style="background:var(--baltic);color:#fff;border-radius:99px;font-size:10px;font-weight:700;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;padding:0 5px;line-height:1;">' + unreadLabel + '</span>'
+                            : '') +
+                    '</div>' +
+                '</div>' +
+                // Etiqueta del producto
+                (prodTitle
+                    ? '<div style="display:flex;align-items:center;gap:5px;margin-top:2px;">' +
+                          (prodImg ? '<img src="' + prodImg + '" alt="" style="width:16px;height:16px;border-radius:3px;object-fit:cover;flex-shrink:0;">' : '') +
+                          '<span style="font-size:11px;color:var(--baltic);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">' + escapeHtml(prodTitle) + '</span>' +
+                      '</div>'
+                    : '') +
+                // Preview del último mensaje
+                '<p class="truncate" style="font-size:13px;margin-top:1px;color:' + previewColor + ';font-weight:' + previewWeight + ';">' +
+                    escapeHtml(previewText) +
+                '</p>' +
+            '</div>' +
+            // Miniatura del producto (derecha)
+            (prodImg
+                ? '<img src="' + prodImg + '" alt="" style="width:42px;height:42px;border-radius:8px;object-fit:cover;flex-shrink:0;">'
+                : '');
+
+        wrapper.appendChild(item);
+        addSwipeBehavior(wrapper, item, name, c.otherId, avatar, c.productId, prodTitle, prodImg, prodPrice, prodSellerId, prod.status || 'available');
+        list.appendChild(wrapper);
+    });
+}
+
+/* ── Swipe-to-delete behaviour ── */
+function addSwipeBehavior(wrapper, item, name, otherId, otherAvatar, productId, productTitle, productImg, productPrice, productSellerId, productStatus) {
+    var bgEl     = wrapper.querySelector('.swipe-bg');
+    var iconEl   = wrapper.querySelector('.swipe-icon');
+    var THRESH   = window.innerWidth * 0.40;
+    var startX, startY, dragging = false, swipeX = 0, hasDragged = false;
+
+    item.addEventListener('touchstart', function(e) {
+        startX    = e.touches[0].clientX;
+        startY    = e.touches[0].clientY;
+        dragging  = false;
+        hasDragged = false;
+        swipeX    = 0;
+        item.style.transition  = 'none';
+        iconEl.style.transition = 'none';
+        bgEl.style.transition   = 'none';
+    }, { passive: true });
+
+    item.addEventListener('touchmove', function(e) {
+        var dx = e.touches[0].clientX - startX;
+        var dy = e.touches[0].clientY - startY;
+
+        // Latch direction on first real movement
+        if (!dragging) {
+            if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+            if (Math.abs(dy) > Math.abs(dx)) return; // vertical scroll takes over
+            dragging = true;
+        }
+        if (dx <= 0) return; // right-swipe only
+        e.preventDefault();
+
+        swipeX     = dx;
+        hasDragged = true;
+        var progress = Math.min(dx / THRESH, 1);
+
+        item.style.transform    = 'translateX(' + dx + 'px)';
+        bgEl.style.opacity      = String(Math.min(progress * 1.6, 1));
+        iconEl.style.transform  = 'scale(' + (0.35 + progress * 0.75) + ')';
+    }, { passive: false });
+
+    item.addEventListener('touchend', function() {
+        if (!dragging) return;
+        dragging = false;
+
+        if (swipeX >= THRESH) {
+            // Confirm before deleting
+            if (confirm('¿Eliminar conversación con ' + name + '?')) {
+                // 1. Slide item fully off screen
+                item.style.transition = 'transform 0.22s ease-in';
+                item.style.transform  = 'translateX(110vw)';
+                // 2. Collapse row height
+                setTimeout(function() {
+                    var h = wrapper.offsetHeight;
+                    wrapper.style.height   = h + 'px';
+                    wrapper.style.overflow = 'hidden';
+                    requestAnimationFrame(function() {
+                        wrapper.style.transition = 'height 0.28s ease, opacity 0.28s ease';
+                        wrapper.style.height     = '0';
+                        wrapper.style.opacity    = '0';
+                    });
+                    deleteConversation(otherId);
+                    setTimeout(function() { wrapper.remove(); }, 300);
+                }, 210);
+            } else {
+                snapBack();
+            }
+        } else {
+            snapBack();
+        }
+    });
+
+    // Prevent tap-after-swipe from opening the chat
+    item.addEventListener('click', function(e) {
+        if (hasDragged) { hasDragged = false; e.stopPropagation(); return; }
+        openChat(otherId, name, otherAvatar || '', productId || null, productTitle || null, productImg || null, productPrice || null, productSellerId || null, productStatus || 'available');
+    });
+
+    function snapBack() {
+        var spring = 'cubic-bezier(0.34,1.56,0.64,1)';
+        item.style.transition   = 'transform 0.38s ' + spring;
+        item.style.transform    = 'translateX(0)';
+        bgEl.style.transition   = 'opacity 0.38s ease';
+        bgEl.style.opacity      = '0';
+        iconEl.style.transition = 'transform 0.38s ' + spring;
+        iconEl.style.transform  = 'scale(0.35)';
+    }
+}
+
+function deleteConversation(otherId) {
+    if (!currentUser) return;
+    var me = currentUser.id;
+    sb.from('messages').delete()
+        .or('and(sender_id.eq.' + me + ',receiver_id.eq.' + otherId + '),' +
+            'and(sender_id.eq.' + otherId + ',receiver_id.eq.' + me + ')')
+        .then(function(r) {
+            if (r.error) console.error('[deleteConversation] FAILED', r.error);
+        });
+}
+
+function renderConversationsEmpty() {
+    document.getElementById('chatList').innerHTML =
+        '<div style="text-align:center;padding:64px 16px 32px;">' +
+            '<svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.4" style="margin:0 auto 16px;display:block;">' +
+                '<path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>' +
+            '</svg>' +
+            '<p style="font-size:16px;font-weight:700;color:#374151;margin-bottom:6px;">Aún no tienes mensajes</p>' +
+            '<p style="font-size:13px;color:#94a3b8;line-height:1.6;">¡Escríbele a un vendedor para empezar!<br>Abre cualquier producto y pulsa <strong style="color:var(--baltic);">Chatear</strong>.</p>' +
+        '</div>';
+}
+
+/* ══════════════════
+   GRID PRODUCTOS
+══════════════════ */
+/* Imagen de placeholder con el icono Tirgus */
+var PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">' +
+    '<rect width="400" height="400" fill="#e6f3f8"/>' +
+    '<path d="M145 195 L145 275 Q145 295 165 295 L235 295 Q255 295 255 275 L255 195 Z" fill="none" stroke="#006994" stroke-width="16" stroke-linejoin="round" opacity="0.35"/>' +
+    '<path d="M168 195 L168 170 Q168 130 200 130 Q232 130 232 170 L232 195" fill="none" stroke="#006994" stroke-width="16" stroke-linecap="round" opacity="0.35"/>' +
+    '<text x="200" y="348" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="30" fill="#006994" opacity="0.4">Tirgus</text>' +
+    '</svg>'
+);
+
+/* Favoritos en memoria de sesión */
+var favorites = new Set();
+
+/* Devuelve el HTML del badge de condición */
+function condBadge(condition) {
+    if (!condition) return '';
+    var styles = {
+        'Nuevo':          'background:#dcfce7;color:#16a34a;',
+        'Como nuevo':     'background:#dbeafe;color:#1d4ed8;',
+        'En buen estado': 'background:#ccfbf1;color:#0d9488;',
+        'Usado':          'background:#f1f5f9;color:#64748b;',
+        'Con desgaste':   'background:#fef3c7;color:#d97706;',
+        'Para piezas':    'background:#fee2e2;color:#dc2626;'
+    };
+    var s = styles[condition] || 'background:#f1f5f9;color:#64748b;';
+    return '<span class="card-badge" style="' + s + '">' + condition + '</span>';
+}
+
+function toggleFav(e, key, btn) {
+    e.stopPropagation();
+
+    // Requiere login
+    if (!isLoggedIn) {
+        requireAuth(function() {});
+        return;
+    }
+
+    var strKey = String(key);
+    var wasFav = favorites.has(strKey);
+
+    // ── Optimistic UI ──
+    if (wasFav) {
+        favorites.delete(strKey);
+        btn.classList.remove('fav-active');
+    } else {
+        favorites.add(strKey);
+        btn.classList.add('fav-active');
+        // Micro-animación de confirmación
+        btn.style.transform = 'scale(1.35)';
+        setTimeout(function() { btn.style.transform = ''; }, 220);
+    }
+    updateSavedBadge();
+
+    // ── Sync Supabase ──
+    if (wasFav) {
+        sb.from('favorites')
+            .delete()
+            .eq('user_id', currentUser.id)
+            .eq('product_id', strKey)
+            .then(function(r) {
+                if (r.error) { favorites.add(strKey); btn.classList.add('fav-active'); updateSavedBadge(); }
+                else { removeSavedCard(strKey); }
+            });
+    } else {
+        sb.from('favorites')
+            .insert({ user_id: currentUser.id, product_id: strKey })
+            .then(function(r) {
+                if (r.error) { favorites.delete(strKey); btn.classList.remove('fav-active'); updateSavedBadge(); }
+            });
+    }
+}
+
+/* Actualiza el badge del tab y el contador del header */
+function updateSavedBadge() {
+    var n     = favorites.size;
+    var badge = document.getElementById('saved-badge');
+    var label = document.getElementById('saved-count-label');
+    if (badge) { badge.style.display = n > 0 ? 'block' : 'none'; badge.textContent = n; }
+    if (label) label.textContent = n > 0 ? n + ' producto' + (n !== 1 ? 's' : '') : '';
+}
+
+/* Refresca todos los corazones visibles según el Set en memoria */
+function refreshFavHearts() {
+    document.querySelectorAll('.card-fav[data-key]').forEach(function(btn) {
+        btn.classList.toggle('fav-active', favorites.has(String(btn.getAttribute('data-key'))));
+    });
+}
+
+/* Elimina una card del grid de Guardados al desfavoritar */
+function removeSavedCard(strKey) {
+    var grid = document.getElementById('savedGrid');
+    if (!grid) return;
+    var card = grid.querySelector('[data-saved-key="' + strKey + '"]');
+    if (card) {
+        card.style.opacity = '0';
+        card.style.transform = 'scale(.9)';
+        card.style.transition = 'opacity .2s, transform .2s';
+        setTimeout(function() { card.remove(); checkSavedEmpty(); }, 200);
+    }
+}
+
+function checkSavedEmpty() {
+    var grid = document.getElementById('savedGrid');
+    if (grid && grid.querySelectorAll('.product-card').length === 0) renderSavedEmpty();
+}
+
+/* ══════════════════
+   VISTA GUARDADOS
+══════════════════ */
+function fetchUserFavorites() {
+    if (!currentUser) return;
+    sb.from('favorites')
+        .select('product_id')
+        .eq('user_id', currentUser.id)
+        .then(function(r) {
+            favorites.clear();
+            (r.data || []).forEach(function(row) { favorites.add(row.product_id); });
+            refreshFavHearts();
+            updateSavedBadge();
+        });
+}
+
+function loadFavorites() {
+    if (!currentUser) return;
+    var grid = document.getElementById('savedGrid');
+    grid.innerHTML = '<p style="grid-column:span 2;text-align:center;padding:48px 0;font-size:13px;color:#b0b5bf;">Cargando…</p>';
+
+    sb.from('favorites')
+        .select('product_id')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .then(function(r) {
+            favorites.clear();
+            var ids = (r.data || []).map(function(row) { return row.product_id; });
+            ids.forEach(function(id) { favorites.add(id); });
+            refreshFavHearts();
+            updateSavedBadge();
+
+            if (ids.length === 0) { renderSavedEmpty(); return; }
+
+            // Primero intenta con allProducts (cache local)
+            var cached = allProducts.filter(function(p) { return ids.includes(String(p.id || p._key)); });
+            if (cached.length > 0) { renderSavedGrid(cached, ids); return; }
+
+            // Fallback: buscar en Supabase por los IDs
+            sb.from('products').select('*').in('id', ids).then(function(pr) {
+                renderSavedGrid(pr.data || [], ids);
+            });
+        });
+}
+
+function renderSavedGrid(items, orderedIds) {
+    var grid = document.getElementById('savedGrid');
+    grid.innerHTML = '';
+    if (!items || items.length === 0) { renderSavedEmpty(); return; }
+
+    // Respeta el orden de favoritos si se pasa
+    if (orderedIds) {
+        items = orderedIds.map(function(id) {
+            return items.find(function(p) { return String(p.id || p._key) === id; });
+        }).filter(Boolean);
+    }
+
+    items.forEach(function(p) {
+        var key  = p.id || p._key;
+        var card = buildCard(p, key);
+        card.setAttribute('data-saved-key', String(key));
+        grid.appendChild(card);
+    });
+    updateSavedBadge();
+}
+
+function renderSavedEmpty() {
+    document.getElementById('savedGrid').innerHTML =
+        '<div style="grid-column:span 2;text-align:center;padding:64px 16px 24px;">' +
+            '<svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.4" style="margin:0 auto 16px;display:block;">' +
+                '<path stroke-linecap="round" stroke-linejoin="round" d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>' +
+            '</svg>' +
+            '<p style="font-size:16px;font-weight:700;color:#374151;margin-bottom:6px;">Aún no tienes guardados</p>' +
+            '<p style="font-size:13px;color:#94a3b8;line-height:1.6;">Toca el <strong style="color:#e11d48;">corazón</strong> en cualquier producto<br>para guardarlo aquí.</p>' +
+        '</div>';
+}
+
+/* Renderiza una card — acepta formato Supabase o local */
+function buildCard(p, idOrKey) {
+    var card  = document.createElement('div');
+    card.className = 'product-card';
+
+    // Precio normalizado
+    var priceLabel = typeof p.price === 'number'
+        ? 'S/ ' + p.price.toLocaleString('es-PE')
+        : (p.price || '');
+
+    // Imagen: usa placeholder SVG si está vacía o falla la carga
+    var imageUrl = p.image_url || p.image || '';
+    var imgSrc   = imageUrl || PLACEHOLDER;
+    var onerr    = imageUrl ? 'this.onerror=null;this.src=PLACEHOLDER' : '';
+
+    // Clave segura para pasar al onclick inline
+    var keyJs = typeof idOrKey === 'string'
+        ? "'" + idOrKey.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "'"
+        : idOrKey;
+
+    var isFav = favorites.has(idOrKey);
+
+    card.innerHTML =
+        '<div class="card-img-wrap">' +
+            '<img src="' + imgSrc + '" alt="' + (p.title || '').replace(/"/g, '&quot;') + '"' +
+                (imageUrl ? ' onerror="this.onerror=null;this.src=PLACEHOLDER"' : '') + '>' +
+            condBadge(p.condition) +
+            (p.status === 'reserved' ? '<div class="product-badge reserved">RESERVADO</div>' : '') +
+            '<button class="card-fav' + (isFav ? ' fav-active' : '') + '" data-key="' + idOrKey + '" onclick="toggleFav(event,' + keyJs + ',this)">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                    '<path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>' +
+                '</svg>' +
+            '</button>' +
+        '</div>' +
+        '<div style="padding:10px 12px 13px;">' +
+            '<p class="card-title" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + (p.title || '') + '</p>' +
+            '<p class="card-price" style="margin-top:5px;">' + priceLabel + '</p>' +
+            '<p class="card-location">' + (p.location || '') + '</p>' +
+        '</div>';
+
+    card.onclick = function() {
+        PRODUCTS[idOrKey] = {
+            title:      p.title,
+            price:      priceLabel,
+            raw_price:  typeof p.price === 'number' ? p.price : parseFloat((p.price || '0').replace(/[^0-9.]/g, '')) || 0,
+            image:      imgSrc,
+            desc:       p.description || p.desc || '',
+            location:   p.location || '',
+            seller:            p.seller_name || p.seller || 'Vendedor',
+            seller_id:         p.seller_id || null,
+            seller_avatar_url: p.seller_avatar_url || null,
+            rating:            p.rating || 5.0,
+            reviews:           p.reviews || 0,
+            category:          p.category || '',
+            condition:         p.condition || '',
+            status:            p.status    || 'available',
+            db_id:             p.id || null
+        };
+        openProduct(idOrKey);
+    };
+    return card;
+}
+
+function renderProducts(dbRows) {
+    allProducts = dbRows || [];
+    applyFilters();
+}
+
+/* ══════════════════
+   FILTROS
+══════════════════ */
+function openFilters() {
+    document.getElementById('filter-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeFilters() {
+    document.getElementById('filter-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+function handleFilterOverlayClick(e) {
+    if (e.target === document.getElementById('filter-overlay')) closeFilters();
+}
+
+function updatePriceSlider(moved) {
+    var minSlider = document.getElementById('filter-price-min');
+    var maxSlider = document.getElementById('filter-price-max');
+    var min = parseInt(minSlider.value);
+    var max = parseInt(maxSlider.value);
+    // Evitar cruce de thumbs
+    if (min > max) {
+        if (moved && moved.id === 'filter-price-min') { minSlider.value = max; min = max; }
+        else                                           { maxSlider.value = min; max = min; }
+    }
+    var pMin = (min / 20000) * 100;
+    var pMax = (max / 20000) * 100;
+    document.getElementById('range-fill').style.left  = pMin + '%';
+    document.getElementById('range-fill').style.width = (pMax - pMin) + '%';
+    document.getElementById('price-label-min').textContent = 'S/ ' + min.toLocaleString('es-PE');
+    document.getElementById('price-label-max').textContent = max >= 20000 ? 'S/ 20,000+' : 'S/ ' + max.toLocaleString('es-PE');
+}
+
+function applyFilters() {
+    var q        = (document.getElementById('search-input').value || '').trim().toLowerCase();
+    var priceMin = parseInt(document.getElementById('filter-price-min').value) || 0;
+    var priceMax = parseInt(document.getElementById('filter-price-max').value) || 20000;
+    var conds    = Array.from(document.querySelectorAll('.cond-cb:checked')).map(function(cb) { return cb.value; });
+    var cats     = Array.from(document.querySelectorAll('.cat-cb:checked')).map(function(cb) { return cb.value; });
+    var loc      = document.getElementById('filter-location').value.toLowerCase();
+
+    var filtered = allProducts.filter(function(p) {
+        var price   = typeof p.price === 'number' ? p.price
+                    : parseFloat((p.price || '0').replace(/[^0-9.]/g, '')) || 0;
+        var titleOk = !q    || (p.title    || '').toLowerCase().includes(q);
+        var priceOk = price >= priceMin && (priceMax >= 20000 || price <= priceMax);
+        var condOk  = conds.length === 0 || conds.includes(p.condition);
+        var catOk   = cats.length  === 0 || cats.includes(p.category);
+        var locOk   = !loc  || (p.location || '').toLowerCase().includes(loc);
+        return titleOk && priceOk && condOk && catOk && locOk;
+    });
+
+    renderGrid(filtered);
+    updateFilterBadge();
+}
+
+function renderGrid(items) {
+    var grid = document.getElementById('productsGrid');
+    grid.innerHTML = '';
+    if (items.length === 0) {
+        if (allProducts.length === 0) {
+            // Base de datos vacía — estado de bienvenida
+            grid.innerHTML =
+                '<div style="grid-column:span 2;text-align:center;padding:64px 16px 32px;">' +
+                    '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.3" style="margin:0 auto 18px;display:block;">' +
+                        '<path stroke-linecap="round" stroke-linejoin="round" d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>' +
+                        '<path stroke-linecap="round" stroke-linejoin="round" d="M16 3l-4 4-4-4"/>' +
+                    '</svg>' +
+                    '<p style="font-size:16px;font-weight:700;color:#374151;margin-bottom:6px;">Aún no hay anuncios en tu zona</p>' +
+                    '<p style="font-size:13px;color:#94a3b8;line-height:1.6;">¡Sé el primero en publicar!<br>Pulsa el <strong style="color:var(--baltic);">+</strong> para añadir tu primer artículo.</p>' +
+                '</div>';
+        } else {
+            // Filtros demasiado estrictos
+            grid.innerHTML =
+                '<div style="grid-column:span 2;text-align:center;padding:56px 16px 24px;">' +
+                    '<p style="font-size:14px;font-weight:600;color:#374151;margin-bottom:4px;">Sin resultados</p>' +
+                    '<p style="font-size:13px;color:#94a3b8;">Prueba otros filtros o amplía la búsqueda.</p>' +
+                '</div>';
+        }
+        return;
+    }
+    items.forEach(function(p) {
+        grid.appendChild(buildCard(p, p.id || p._key));
+    });
+}
+
+function updateFilterBadge() {
+    var q        = (document.getElementById('search-input').value || '').trim();
+    var priceMin = parseInt(document.getElementById('filter-price-min').value) || 0;
+    var priceMax = parseInt(document.getElementById('filter-price-max').value) || 20000;
+    var hasConds = document.querySelectorAll('.cond-cb:checked').length > 0;
+    var hasCats  = document.querySelectorAll('.cat-cb:checked').length > 0;
+    var hasLoc   = !!document.getElementById('filter-location').value;
+
+    var active = priceMin > 0 || priceMax < 20000 || hasConds || hasCats || hasLoc;
+    document.getElementById('filter-badge').style.display = active ? 'block' : 'none';
+    document.getElementById('btn-filters').style.color       = active ? 'var(--baltic)' : '#6b7280';
+    document.getElementById('btn-filters').style.borderColor = active ? 'var(--baltic)' : '#e2e8f0';
+    document.getElementById('btn-filters').style.background  = active ? 'var(--baltic-light)' : '#fff';
+}
+
+function resetFilters() {
+    document.getElementById('filter-price-min').value = '0';
+    document.getElementById('filter-price-max').value = '20000';
+    document.querySelectorAll('.cond-cb').forEach(function(cb) { cb.checked = false; });
+    document.querySelectorAll('.cat-cb').forEach(function(cb) { cb.checked = false; });
+    document.getElementById('filter-location').value = '';
+    updatePriceSlider(null);
+    applyFilters();
+}
+
+function fetchProducts() {
+    var grid = document.getElementById('productsGrid');
+    grid.innerHTML =
+        '<p style="grid-column:span 2;text-align:center;padding:48px 0;font-size:13px;color:#b0b5bf;">Cargando…</p>';
+
+    sb.from('products')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .then(function(result) {
+            if (result.error) {
+                console.warn('Supabase products:', result.error.message);
+                grid.innerHTML =
+                    '<div style="grid-column:span 2;text-align:center;padding:56px 16px 24px;">' +
+                        '<p style="font-size:14px;color:#94a3b8;">No se pudo cargar el catálogo.<br>' +
+                        '<span style="font-size:12px;">Comprueba tu conexión y recarga la página.</span></p>' +
+                    '</div>';
+                return;
+            }
+            var products = result.data || [];
+            if (products.length === 0) { renderProducts([]); return; }
+
+            // Fetch seller profiles to get avatar + display name
+            var sellerIds = products.map(function(p) { return p.seller_id; }).filter(Boolean);
+            var unique    = sellerIds.filter(function(v, i, a) { return a.indexOf(v) === i; });
+            if (unique.length === 0) { renderProducts(products); return; }
+
+            sb.from('profiles').select('id, username, avatar_url').in('id', unique)
+                .then(function(pr) {
+                    var pm = {};
+                    (pr.data || []).forEach(function(prof) { pm[prof.id] = prof; });
+                    // Merge avatar + username into each product row
+                    var enriched = products.map(function(p) {
+                        var prof = pm[p.seller_id] || {};
+                        return Object.assign({}, p, {
+                            seller_name:       prof.username       || p.seller_name,
+                            seller_avatar_url: prof.avatar_url     || null
+                        });
+                    });
+                    renderProducts(enriched);
+                });
+        });
+}
+
+/* ══════════════════
+   MODAL PUBLICAR
+══════════════════ */
+function openPublish() {
+    if (!isLoggedIn) {
+        requireAuth(function() { openPublish(); });
+        return;
+    }
+    document.getElementById('publish-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+
+function openEdit(id) {
+    var p = PRODUCTS[id];
+    if (!p || !p.db_id) return;
+
+    editingProductId = p.db_id;
+
+    // Fill form fields
+    document.getElementById('pub-title').value    = p.title || '';
+    document.getElementById('pub-price').value    = p.raw_price || '';
+    document.getElementById('pub-category').value = p.category || '';
+    document.getElementById('pub-location').value = p.location || '';
+    document.getElementById('pub-desc').value     = p.desc || '';
+
+    // Pre-select condition button
+    document.querySelectorAll('.condition-btn').forEach(function(b) {
+        var match = b.getAttribute('data-val') === p.condition;
+        b.style.background  = match ? 'var(--baltic)' : '';
+        b.style.color       = match ? '#fff' : '';
+        b.style.borderColor = match ? 'var(--baltic)' : '#e2e8f0';
+    });
+    selectedCondition = p.condition || '';
+
+    // Update modal UI for edit mode
+    document.querySelector('#publish-sheet h2').textContent = 'Editar anuncio';
+    var btn = document.querySelector('#publish-sheet .btn-primary');
+    btn.textContent = 'Guardar cambios';
+
+    document.getElementById('publish-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+
+function closePublish() {
+    document.getElementById('publish-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+function handleOverlayClick(e) {
+    if (e.target === document.getElementById('publish-overlay')) closePublish();
+}
+
+function selectCondition(btn) {
+    document.querySelectorAll('.condition-btn').forEach(function(b) {
+        b.style.background   = '';
+        b.style.color        = '';
+        b.style.borderColor  = '#e2e8f0';
+    });
+    btn.style.background  = 'var(--baltic)';
+    btn.style.color       = '#fff';
+    btn.style.borderColor = 'var(--baltic)';
+    selectedCondition = btn.getAttribute('data-val');
+}
+
+function handlePhotos(e) {
+    var files = Array.from(e.target.files);
+    var area  = document.getElementById('photoPreviewArea');
+    files.forEach(function(file) {
+        if (publishPhotos.length >= 8) return;
+        publishPhotos.push(file);
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+            var img = document.createElement('img');
+            img.src = ev.target.result;
+            img.className = 'photo-thumb';
+            area.insertBefore(img, document.getElementById('addPhotoBtn'));
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function setPublishLoading(on) {
+    var btn = document.querySelector('#publish-sheet .btn-primary');
+    if (!btn) return;
+    btn.disabled      = on;
+    btn.style.opacity = on ? '.6' : '1';
+    if (on) {
+        btn.textContent = editingProductId ? 'Guardando...' : 'Publicando...';
+    } else {
+        btn.textContent = editingProductId ? 'Guardar cambios' : 'Publicar objeto';
+    }
+}
+
+function resetPublishForm() {
+    ['pub-title','pub-price','pub-location','pub-desc'].forEach(function(id) {
+        document.getElementById(id).value = '';
+    });
+    document.getElementById('pub-category').value = '';
+    document.querySelectorAll('.condition-btn').forEach(function(b) {
+        b.style.background = ''; b.style.color = ''; b.style.borderColor = '#e2e8f0';
+    });
+    publishPhotos = [];
+    selectedCondition = '';
+    editingProductId = null;
+    document.getElementById('photoPreviewArea')
+        .querySelectorAll('.photo-thumb').forEach(function(img) { img.remove(); });
+    document.getElementById('photoInput').value = '';
+    // Restore modal title and button for next publish
+    document.querySelector('#publish-sheet h2').textContent = 'Publicar objeto';
+    var btn = document.querySelector('#publish-sheet .btn-primary');
+    if (btn) btn.textContent = 'Publicar objeto';
+}
+
+function submitPublish() {
+    if (!isLoggedIn) { requireAuth(openPublish); return; }
+
+    var title    = document.getElementById('pub-title').value.trim();
+    var price    = parseFloat(document.getElementById('pub-price').value);
+    var category = document.getElementById('pub-category').value;
+    var location = document.getElementById('pub-location').value.trim();
+    var desc     = document.getElementById('pub-desc').value.trim();
+
+    if (!title || !price || !category || !location || !desc) {
+        var btn = document.querySelector('#publish-sheet .btn-primary');
+        btn.classList.add('auth-shake');
+        setTimeout(function() { btn.classList.remove('auth-shake'); }, 400);
+        return;
+    }
+
+    setPublishLoading(true);
+
+    // ── EDIT MODE ──────────────────────────────────────────────────────────
+    if (editingProductId) {
+        var dbId = editingProductId;
+
+        function doUpdate(imageUrl) {
+            var payload = {
+                title:       title,
+                price:       price,
+                description: desc,
+                category:    category,
+                location:    location,
+                condition:   selectedCondition || 'Usado'
+            };
+            if (imageUrl) payload.image_url = imageUrl;
+
+            sb.from('products')
+                .update(payload)
+                .eq('id', dbId)
+                .eq('seller_id', currentUser.id)   // seguridad: solo el dueño
+                .then(function(result) {
+                    setPublishLoading(false);
+                    if (result.error) {
+                        alert('Error al guardar: ' + result.error.message);
+                        return;
+                    }
+                    // Update local cache so the product view reflects changes immediately
+                    for (var key in PRODUCTS) {
+                        if (PRODUCTS[key].db_id === dbId) {
+                            PRODUCTS[key].title     = title;
+                            PRODUCTS[key].raw_price = price;
+                            PRODUCTS[key].price     = 'S/ ' + price.toLocaleString('es-PE');
+                            PRODUCTS[key].desc      = desc;
+                            PRODUCTS[key].location  = location;
+                            PRODUCTS[key].category  = category;
+                            PRODUCTS[key].condition = selectedCondition || 'Usado';
+                            if (imageUrl) PRODUCTS[key].image = imageUrl;
+                            // Show success on button briefly before closing
+                            var btn2 = document.querySelector('#publish-sheet .btn-primary');
+                            if (btn2) { btn2.textContent = '¡Anuncio actualizado!'; btn2.style.background = '#16a34a'; }
+                            setTimeout(function() {
+                                var cacheKey = key;
+                                closePublish();
+                                resetPublishForm();
+                                fetchProducts();
+                                openProduct(cacheKey);   // re-open with fresh data
+                            }, 900);
+                            break;
+                        }
+                    }
+                });
+        }
+
+        if (publishPhotos.length > 0) {
+            var file2 = publishPhotos[0];
+            var ext2  = file2.name.split('.').pop();
+            var path2 = currentUser.id + '/' + Date.now() + '.' + ext2;
+            console.log('[upload/edit] bucket=products path=' + path2 + ' size=' + file2.size + 'B');
+            sb.storage.from('products').upload(path2, file2, { upsert: true })
+                .then(function(r2) {
+                    if (r2.error) {
+                        console.error('[upload/edit] FAILED — bucket=products', r2.error);
+                        doUpdate(null);
+                        return;
+                    }
+                    var publicUrl2 = sb.storage.from('products').getPublicUrl(path2).data.publicUrl;
+                    console.log('[upload/edit] OK — publicUrl=', publicUrl2);
+                    doUpdate(publicUrl2);
+                });
+        } else {
+            doUpdate(null);
+        }
+        return;
+    }
+
+    // ── INSERT MODE ────────────────────────────────────────────────────────
+    function doInsert(imageUrl) {
+        sb.from('products').insert({
+            title:       title,
+            price:       price,
+            description: desc,
+            category:    category,
+            location:    location,
+            condition:   selectedCondition || 'Usado',
+            image_url:   imageUrl,
+            seller_id:   currentUser.id
+            // seller_name se lee siempre de profiles.username — no se guarda aquí
+        }).then(function(result) {
+            setPublishLoading(false);
+            if (result.error) {
+                alert('Error al publicar: ' + result.error.message);
+                return;
+            }
+            closePublish();
+            resetPublishForm();
+            fetchProducts();   // refresca la home con los datos reales
+        });
+    }
+
+    if (publishPhotos.length > 0) {
+        var file = publishPhotos[0];
+        var ext  = file.name.split('.').pop();
+        var path = currentUser.id + '/' + Date.now() + '.' + ext;
+
+        console.log('[upload] bucket=products path=' + path + ' size=' + file.size + 'B');
+        sb.storage.from('products').upload(path, file, { upsert: true })
+            .then(function(result) {
+                if (result.error) {
+                    console.error('[upload] FAILED — bucket=products', result.error);
+                    doInsert(null);
+                    return;
+                }
+                var urlResult = sb.storage.from('products').getPublicUrl(path);
+                console.log('[upload] OK — publicUrl=', urlResult.data.publicUrl);
+                doInsert(urlResult.data.publicUrl);
+            });
+    } else {
+        doInsert(null);
+    }
+}
+
+/* ══════════════════
+   PERFIL
+══════════════════ */
+var selectedAccount = 'personal';
+
+function selectAccount(type) {
+    selectedAccount = type;
+    var personal = document.getElementById('acct-personal');
+    var business = document.getElementById('acct-business');
+    if (type === 'personal') {
+        personal.style.border  = '2px solid var(--baltic)';
+        personal.style.background = 'var(--baltic-light)';
+        personal.querySelector('span').style.color = 'var(--baltic)';
+        personal.querySelector('svg').setAttribute('stroke', 'var(--baltic)');
+        business.style.border  = '2px solid #e2e8f0';
+        business.style.background = '#fff';
+        business.querySelector('span').style.color = '#374151';
+        business.querySelector('svg').setAttribute('stroke', '#94a3b8');
+    } else {
+        business.style.border  = '2px solid var(--baltic)';
+        business.style.background = 'var(--baltic-light)';
+        business.querySelector('span').style.color = 'var(--baltic)';
+        business.querySelector('svg').setAttribute('stroke', 'var(--baltic)');
+        personal.style.border  = '2px solid #e2e8f0';
+        personal.style.background = '#fff';
+        personal.querySelector('span').style.color = '#374151';
+        personal.querySelector('svg').setAttribute('stroke', '#94a3b8');
+    }
+}
+
+function toggleSwitch(el) {
+    el.classList.toggle('active');
+}
+
+function previewAvatar(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+        var img = document.getElementById('avatarImg');
+        var initial = document.getElementById('avatarInitial');
+        img.src = ev.target.result;
+        img.style.display = 'block';
+        initial.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+}
+
+function previewCover(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+        var cover = document.getElementById('coverContainer');
+        cover.style.backgroundImage = 'url(' + ev.target.result + ')';
+        cover.style.backgroundSize  = 'cover';
+        cover.style.backgroundPosition = 'center';
+    };
+    reader.readAsDataURL(file);
+}
+
+function saveProfile() {
+    if (!currentUser) return;
+    var btn      = event.currentTarget;
+    var username = (document.getElementById('prof-username').value || '').trim();
+    var bio      = (document.getElementById('prof-bio').value      || '').trim();
+    var location = (document.getElementById('prof-location').value || '').trim();
+
+    btn.textContent   = 'Guardando...';
+    btn.style.opacity = '.7';
+    btn.disabled      = true;
+
+    function doUpsert(avatarUrl) {
+        var payload = {
+            id:       currentUser.id,
+            username: username || null,
+            bio:      bio      || null,
+            location: location || null
+        };
+        if (avatarUrl) payload.avatar_url = avatarUrl;
+
+        console.log('[upsert/profiles] sending payload →', JSON.stringify(payload));
+
+        sb.from('profiles').upsert(payload, { onConflict: 'id' }).then(function(result) {
+            btn.disabled      = false;
+            btn.style.opacity = '1';
+            if (result.error) {
+                console.error('[upsert/profiles] FAILED — code:', result.error.code,
+                    '| message:', result.error.message,
+                    '| details:', result.error.details,
+                    '| hint:', result.error.hint,
+                    '| full:', result.error);
+                btn.textContent      = 'Error al guardar';
+                btn.style.background = '#dc2626';
+            } else {
+                console.log('[upsert/profiles] OK — avatar_url saved:', avatarUrl || '(sin cambio)');
+                btn.textContent      = '✓ Cambios guardados';
+                btn.style.background = '#16a34a';
+                if (username) {
+                    var initEl = document.getElementById('avatarInitial');
+                    if (initEl) initEl.textContent = username.charAt(0).toUpperCase();
+                }
+            }
+            setTimeout(function() {
+                btn.textContent      = 'Guardar cambios';
+                btn.style.background = 'var(--baltic)';
+            }, 2500);
+        });
+    }
+
+    var avatarFile = document.getElementById('avatarInput').files[0];
+    if (avatarFile) {
+        // Filename includes timestamp → unique URL per upload → no browser cache issues
+        var ext  = (avatarFile.name.split('.').pop() || 'jpg').toLowerCase();
+        var path = currentUser.id + '/avatar-' + Date.now() + '.' + ext;
+        console.log('[upload/avatar] starting — bucket=avatars | path=' + path + ' | size=' + avatarFile.size + 'B | type=' + avatarFile.type);
+        sb.storage.from('avatars').upload(path, avatarFile, { upsert: false, contentType: avatarFile.type || 'image/jpeg' })
+            .then(function(r) {
+                if (r.error) {
+                    console.error('[upload/avatar] FAILED — bucket=avatars | statusCode:', r.error.statusCode,
+                        '| message:', r.error.message, '| full:', r.error);
+                    doUpsert(null);   // save other profile fields even if photo upload fails
+                    return;
+                }
+                var publicUrl = sb.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+                console.log('[upload/avatar] OK — publicUrl =', publicUrl);
+                // Show new avatar in UI immediately (cache-buster on src)
+                var imgEl  = document.getElementById('avatarImg');
+                var initEl = document.getElementById('avatarInitial');
+                if (imgEl)  { imgEl.src = publicUrl + '?t=' + Date.now(); imgEl.style.display = 'block'; }
+                if (initEl) initEl.style.display = 'none';
+                doUpsert(publicUrl);   // store clean URL (without ?t=) in the DB
+            });
+    } else {
+        console.log('[upload/avatar] no file selected — skipping storage upload');
+        doUpsert(null);
+    }
+}
+
+function confirmLogout() {
+    if (confirm('¿Cerrar sesión en Tirgus?')) {
+        // Wipe all user state and UI synchronously — no waiting for signOut
+        isLoggedIn    = false;
+        currentUser   = null;
+        pendingAction = null;
+        clearUserUI();
+        favorites.clear();
+        updateSavedBadge();
+        showAuthView();
+        sb.auth.signOut();   // fire and forget — state is already clean
+    }
+}
+
+/* ── Teclado: Esc ── */
+document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('filter-overlay').classList.contains('open')) {
+        closeFilters(); return;
+    }
+    if (document.getElementById('publish-overlay').classList.contains('open')) {
+        closePublish(); return;
+    }
+    if (document.getElementById('product-view').classList.contains('active')) {
+        closeProduct(); return;
+    }
+    if (document.getElementById('chat-view').classList.contains('active')) {
+        closeChat(); return;
+    }
+    if (document.getElementById('auth-view').classList.contains('active')) {
+        goBackFromAuth(); return;
+    }
+    if (currentTab !== 'home') {
+        showTab('home');
+    }
+});
+
+/* ── INIT ── */
+updatePriceSlider(null);   // inicializar barra de precio
+fetchProducts();
+
+// Comprobar sesión existente al cargar
+sb.auth.getSession().then(function(result) {
+    if (result.data && result.data.session) {
+        isLoggedIn  = true;
+        currentUser = result.data.session.user;
+        applyUserToUI(currentUser);
+        fetchUserFavorites();
+        if (currentTab === 'profile') loadProfile();
+    }
+});
+</script>
+</body>
+</html>
