@@ -2983,5 +2983,91 @@ sb.auth.getSession().then(function(result) {
     }
 });
 </script>
+let currentRating = 0;
+let productBeingSold = null;
+
+function openReviewModal(productId) {
+    productBeingSold = productId;
+    currentRating = 0;
+    setRating(0);
+    document.getElementById('review-comment').value = '';
+    document.getElementById('review-modal').classList.remove('hidden');
+}
+
+function closeReviewModal() {
+    document.getElementById('review-modal').classList.add('hidden');
+}
+
+function setRating(n) {
+    currentRating = n;
+    const stars = document.querySelectorAll('.star-btn');
+    const labels = ["Malo", "Regular", "Bueno", "Muy Bueno", "Excelente"];
+    
+    stars.forEach((star, i) => {
+        if (i < n) {
+            star.innerText = '★';
+            star.style.color = '#1E40AF'; // Azul Báltico
+        } else {
+            star.innerText = '☆';
+            star.style.color = '#D1D5DB'; // Gris
+        }
+    });
+    
+    const label = document.getElementById('rating-label');
+    label.innerText = n > 0 ? labels[n-1] : "Toca una estrella";
+    if(n > 0) label.style.color = '#1E40AF';
+}
+
+async function submitReview() {
+    if (currentRating === 0) return alert("Por favor, selecciona una puntuación");
+    
+    const comment = document.getElementById('review-comment').value;
+
+    // Aquí va tu lógica de Supabase (asumiendo que tienes la tabla 'reviews')
+    const { error } = await supabase.from('reviews').insert([
+        { product_id: productBeingSold, rating: currentRating, comment: comment }
+    ]);
+
+    // Cambiar estado a vendido
+    await supabase.from('products').update({ status: 'sold' }).eq('id', productBeingSold);
+
+    if (!error) {
+        alert("¡Vendido! Gracias por tu valoración.");
+        location.reload();
+    }
+}
 </body>
+<div id="review-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onclick="closeReviewModal()"></div>
+
+  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 z-10">
+    <div class="flex items-center justify-between mb-5">
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900">Finalizar venta</h2>
+        <p class="text-sm text-gray-500 mt-0.5">Valora tu experiencia en Tirgus</p>
+      </div>
+      <button onclick="closeReviewModal()" class="text-gray-400 hover:text-gray-600">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+
+    <div class="mb-5 text-center">
+      <div class="flex justify-center gap-2 mb-2">
+        <button onclick="setRating(1)" class="star-btn text-4xl transition-transform hover:scale-110">☆</button>
+        <button onclick="setRating(2)" class="star-btn text-4xl transition-transform hover:scale-110">☆</button>
+        <button onclick="setRating(3)" class="star-btn text-4xl transition-transform hover:scale-110">☆</button>
+        <button onclick="setRating(4)" class="star-btn text-4xl transition-transform hover:scale-110">☆</button>
+        <button onclick="setRating(5)" class="star-btn text-4xl transition-transform hover:scale-110">☆</button>
+      </div>
+      <p id="rating-label" class="text-xs font-medium text-gray-400 uppercase tracking-wider">Toca una estrella</p>
+    </div>
+
+    <textarea id="review-comment" rows="3" placeholder="¿Algo que destacar del comprador?" 
+      class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition mb-6"></textarea>
+
+    <button onclick="submitReview()" class="w-full py-3 rounded-xl bg-[#1E40AF] text-white font-bold hover:bg-[#1e3a8a] transition">
+      Confirmar y cerrar trato
+    </button>
+  </div>
+</div>
 </html>
