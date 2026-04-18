@@ -72,7 +72,7 @@
             border-radius: 6px; letter-spacing: .02em; line-height: 1.5; z-index: 2;
         }
 
-        /* ── Badge "RESERVADO" en esquina superior izquierda ── */
+        /* ── Badges de estado en esquina superior izquierda ── */
         .product-badge.reserved {
             position: absolute;
             top: 10px;
@@ -84,6 +84,12 @@
             font-weight: bold;
             border-radius: 4px;
             z-index: 10;
+        }
+        .product-badge.sold {
+            position: absolute; top: 10px; left: 10px;
+            background-color: #64748b; color: #fff;
+            padding: 4px 10px; font-size: 11px; font-weight: bold;
+            border-radius: 4px; z-index: 10;
         }
 
         /* ── Burbujas chat ── */
@@ -121,6 +127,30 @@
             transition: opacity .15s;
         }
         .chat-prod-btn:active { opacity: .8; }
+
+        /* ── Perfil Público del Vendedor ── */
+        #seller-profile-view { z-index: 47; padding-bottom: 24px; }
+        .seller-tab-btn {
+            flex: 1; padding: 13px 0; font-size: 13px; font-weight: 600;
+            border: none; background: none; cursor: pointer; color: #94a3b8;
+            border-bottom: 2.5px solid transparent; transition: color .15s, border-color .15s;
+        }
+        .seller-tab-btn.active { color: var(--baltic); border-bottom-color: var(--baltic); }
+        .seller-prod-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+            padding: 14px 14px 0;
+        }
+        .seller-prod-card {
+            border-radius: 12px; overflow: hidden; background: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 10px rgba(0,0,0,.05);
+            cursor: pointer; transition: transform .15s;
+        }
+        .seller-prod-card:active { transform: scale(.97); }
+        .seller-prod-card img { width:100%; aspect-ratio:1/1; object-fit:cover; display:block; }
+        .review-card {
+            background: #fff; border-radius: 14px; padding: 14px 16px;
+            margin: 0 14px 10px; box-shadow: 0 1px 4px rgba(0,0,0,.06);
+        }
 
         /* ── Offer modal ── */
         #offerModal {
@@ -200,7 +230,9 @@
 
         /* Área de fotos */
         #photoPreviewArea { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-        .photo-thumb { width: 72px; height: 72px; border-radius: 8px; object-fit: cover; position: relative; }
+        .photo-thumb-wrap { position: relative; width: 72px; height: 72px; flex-shrink: 0; }
+        .photo-thumb { width: 72px; height: 72px; border-radius: 8px; object-fit: cover; display: block; }
+        .photo-thumb-del { position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; border: none; cursor: pointer; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0; }
         #addPhotoBtn {
             width: 72px; height: 72px; border-radius: 8px; border: 2px dashed #cbd5e1;
             background: #f8fafc; display: flex; flex-direction: column; align-items: center;
@@ -404,159 +436,138 @@
                 </svg>
             </button>
             <span style="font-size:17px;font-weight:700;color:#1a1a2e;flex:1;">Mi perfil</span>
-            <button onclick="confirmLogout()" style="font-size:12px;font-weight:500;color:#94a3b8;background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:8px;">
+            <button onclick="confirmLogout()" style="font-size:12px;font-weight:600;color:#ef4444;background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:8px;">
                 Cerrar sesión
             </button>
         </div>
 
-        <!-- ── SECCIÓN 1: Fotos ── -->
-        <div style="margin:8px 16px 0;background:#fff;border-radius:16px;overflow:hidden;">
+        <!-- ── Tarjeta de perfil ── -->
+        <div style="margin:8px 16px 0;background:#fff;border-radius:16px;overflow:visible;">
             <!-- Portada -->
-            <div id="coverContainer" style="height:110px;background:linear-gradient(135deg,#006994 0%,#0099cc 100%);position:relative;cursor:pointer;" onclick="document.getElementById('coverInput').click()">
-                <div style="position:absolute;bottom:8px;right:10px;background:rgba(0,0,0,.35);border-radius:8px;padding:4px 10px;display:flex;align-items:center;gap:5px;">
+            <div id="coverContainer" style="height:110px;background:linear-gradient(135deg,#006994 0%,#0099cc 100%);position:relative;cursor:pointer;border-radius:16px 16px 0 0;" onclick="document.getElementById('coverInput').click()">
+                <div style="position:absolute;bottom:10px;right:12px;background:var(--baltic);border-radius:8px;padding:5px 12px;display:flex;align-items:center;gap:6px;box-shadow:0 1px 4px rgba(0,0,0,.25);">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                    <span style="font-size:11px;color:#fff;font-weight:500;">Cambiar portada</span>
+                    <span style="font-size:11px;color:#fff;font-weight:600;">Cambiar portada</span>
                 </div>
                 <input type="file" id="coverInput" accept="image/*" style="display:none" onchange="previewCover(event)">
             </div>
-            <!-- Avatar sobre la portada -->
-            <div style="padding:0 18px 18px;position:relative;">
-                <div style="position:relative;display:inline-block;margin-top:-34px;">
-                    <div id="avatarRing" style="width:68px;height:68px;border-radius:50%;border:3px solid #fff;overflow:hidden;background:var(--baltic);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.15);">
-                        <span id="avatarInitial" style="font-size:26px;font-weight:700;color:#fff;">J</span>
+            <!-- Avatar + botón Editar perfil -->
+            <div style="padding:0 18px 16px;position:relative;">
+                <!-- Fila 1: avatar (sobresale de la portada) -->
+                <div style="margin-top:-36px;position:relative;z-index:2;display:inline-block;">
+                    <div id="avatarRing" style="width:72px;height:72px;border-radius:50%;border:4px solid #fff;overflow:hidden;background:var(--baltic);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.18);">
+                        <span id="avatarInitial" style="font-size:24px;font-weight:700;color:#fff;">J</span>
                         <img id="avatarImg" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;">
                     </div>
-                    <button onclick="document.getElementById('avatarInput').click()" style="position:absolute;bottom:-2px;right:-2px;width:22px;height:22px;border-radius:50%;background:var(--baltic);border:2px solid #fff;display:flex;align-items:center;justify-content:center;cursor:pointer;">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
+                </div>
+                <!-- Fila 2: nombre + botón Editar en la misma línea, alineados al centro vertical -->
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;gap:10px;">
+                    <p id="prof-display-name" style="font-size:17px;font-weight:700;color:#1a1a2e;line-height:1.2;margin:0;flex:1;min-width:0;"></p>
+                    <button onclick="openEditProfile()"
+                        style="font-size:13px;font-weight:600;color:var(--baltic);background:#fff;border:1.5px solid var(--baltic);border-radius:10px;padding:7px 16px;cursor:pointer;font-family:inherit;flex-shrink:0;">
+                        Editar perfil
                     </button>
-                    <input type="file" id="avatarInput" accept="image/*" style="display:none" onchange="previewAvatar(event)">
                 </div>
-                <div style="margin-top:10px;">
-                    <!-- Nombre — editable inline -->
-                    <input type="text" id="prof-username" value="Juan Pérez"
-                        class="prof-input"
-                        placeholder="Tu nombre de usuario"
-                        style="font-size:16px;font-weight:700;color:#1a1a2e;background:transparent;border-color:transparent;padding:2px 0;width:100%;margin-bottom:3px;transition:all .18s;"
-                        onfocus="this.style.background='#fff';this.style.borderColor='var(--baltic)';this.style.padding='6px 10px';"
-                        onblur="this.style.background='transparent';this.style.borderColor='transparent';this.style.padding='2px 0';">
-                    <!-- Estrellas + stats -->
-                    <div id="prof-stats-row" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-height:20px;margin-bottom:7px;">
-                        <div id="prof-stars" style="display:inline-flex;align-items:center;gap:1px;"></div>
-                        <span id="prof-rating-num" style="font-size:12px;font-weight:600;color:#374151;"></span>
-                        <span id="prof-sales" style="font-size:12px;color:#b0b5bf;"></span>
-                        <span id="prof-since" style="font-size:12px;color:#b0b5bf;"></span>
-                    </div>
-                    <!-- Bio — editable inline -->
-                    <textarea id="prof-bio" class="prof-input" rows="2"
-                        placeholder="Añade una bio… ¿qué vendes? ¿dónde estás?"
-                        style="resize:none;font-size:13px;line-height:1.5;background:transparent;border-color:transparent;padding:2px 0;width:100%;transition:all .18s;"
-                        onfocus="this.style.background='#fff';this.style.borderColor='var(--baltic)';this.style.padding='8px 10px';"
-                        onblur="this.style.background='transparent';this.style.borderColor='transparent';this.style.padding='2px 0';"></textarea>
+                <div id="prof-stats-row" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-height:18px;margin-top:4px;">
+                    <div id="prof-stars" style="display:inline-flex;align-items:center;gap:1px;"></div>
+                    <span id="prof-rating-num" style="font-size:12px;font-weight:600;color:#374151;"></span>
+                    <span id="prof-sales" style="font-size:12px;color:#b0b5bf;"></span>
+                    <span id="prof-since" style="font-size:12px;color:#b0b5bf;"></span>
                 </div>
+                <p id="prof-display-bio" style="font-size:13px;color:#64748b;margin-top:6px;line-height:1.5;display:none;"></p>
             </div>
         </div>
 
-        <!-- ── SECCIÓN 2: Información pública ── -->
-        <div style="margin:10px 16px 0;background:#fff;border-radius:16px;padding:18px;">
-            <p style="font-size:11px;font-weight:700;color:#b0b5bf;letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px;">Información pública</p>
-
-            <!-- Email (solo lectura) -->
-            <div style="margin-bottom:14px;">
-                <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px;">Email</label>
-                <input type="email" id="prof-email" class="prof-input" readonly
-                    style="background:#f8fafc;color:#94a3b8;cursor:default;"
-                    placeholder="tu@correo.com">
-            </div>
-            <!-- Ubicación -->
-            <div style="margin-bottom:12px;">
-                <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px;">Ubicación</label>
-                <div style="position:relative;">
-                    <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.45;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#006994" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-                    <input type="text" id="prof-location" value="Lince, Lima" class="prof-input" style="padding-left:32px;" placeholder="Tu ciudad">
-                </div>
-            </div>
-
-            <!-- Mapa simulado -->
-            <div style="border-radius:12px;overflow:hidden;height:120px;background:#e8edf2;position:relative;margin-top:4px;">
-                <img src="https://api.mapbox.com/styles/v1/mapbox/light-v11/static/-77.0282,-12.0758,13,0/400x240@2x?access_token=pk.placeholder" alt=""
-                    onerror="this.style.display='none'"
-                    style="width:100%;height:100%;object-fit:cover;">
-                <!-- Fallback visual si no carga el mapa -->
-                <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#006994" stroke-width="1.6" opacity=".5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
-                    <span style="font-size:11px;color:#94a3b8;font-weight:500;">Lince, Lima · Perú</span>
-                </div>
-                <!-- Pin central -->
-                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);width:18px;height:18px;background:var(--baltic);border-radius:50% 50% 50% 0;transform:translate(-50%,-60%) rotate(-45deg);box-shadow:0 2px 6px rgba(0,105,148,.4);"></div>
-            </div>
-        </div>
-
-        <!-- ── SECCIÓN 3: Tipo de cuenta ── -->
-        <div style="margin:10px 16px 0;background:#fff;border-radius:16px;padding:18px;">
-            <p style="font-size:11px;font-weight:700;color:#b0b5bf;letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px;">Tipo de cuenta</p>
-            <div style="display:flex;gap:10px;">
-                <!-- Personal -->
-                <div id="acct-personal" onclick="selectAccount('personal')"
-                    style="flex:1;border:2px solid var(--baltic);border-radius:12px;padding:14px 12px;cursor:pointer;background:var(--baltic-light);">
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--baltic)" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                        <span style="font-size:13px;font-weight:700;color:var(--baltic);">Personal</span>
-                    </div>
-                    <p style="font-size:11px;color:#6b7280;line-height:1.4;">Para vender objetos de segunda mano de forma puntual.</p>
-                </div>
-                <!-- Negocio -->
-                <div id="acct-business" onclick="selectAccount('business')"
-                    style="flex:1;border:2px solid #e2e8f0;border-radius:12px;padding:14px 12px;cursor:pointer;">
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 8v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                        <span style="font-size:13px;font-weight:700;color:#374151;">Negocio</span>
-                    </div>
-                    <p style="font-size:11px;color:#6b7280;line-height:1.4;">Para tiendas y vendedores profesionales con stock regular.</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── SECCIÓN 4: Ajustes de cuenta ── -->
-        <div style="margin:10px 16px 0;background:#fff;border-radius:16px;overflow:hidden;">
-            <p style="font-size:11px;font-weight:700;color:#b0b5bf;letter-spacing:.06em;text-transform:uppercase;padding:16px 18px 10px;">Ajustes de cuenta</p>
-            <!-- Fila: notificaciones -->
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid #f2f4f7;">
-                <div style="display:flex;align-items:center;gap:12px;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#006994" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17H9a3 3 0 01-3-3V9a6 6 0 0112 0v5a3 3 0 01-3 3zM12 20v1"/></svg>
-                    <span style="font-size:14px;font-weight:500;color:#1a1a2e;">Notificaciones</span>
-                </div>
-                <div class="toggle-switch active" id="toggle-notif" onclick="toggleSwitch(this)">
-                    <div class="toggle-thumb"></div>
-                </div>
-            </div>
-            <!-- Fila: privacidad -->
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid #f2f4f7;">
-                <div style="display:flex;align-items:center;gap:12px;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#006994" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    <span style="font-size:14px;font-weight:500;color:#1a1a2e;">Perfil público</span>
-                </div>
-                <div class="toggle-switch" id="toggle-public" onclick="toggleSwitch(this)">
-                    <div class="toggle-thumb"></div>
-                </div>
-            </div>
-            <!-- Fila: idioma -->
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid #f2f4f7;cursor:pointer;">
-                <div style="display:flex;align-items:center;gap:12px;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#006994" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>
-                    <span style="font-size:14px;font-weight:500;color:#1a1a2e;">Idioma</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:4px;">
-                    <span style="font-size:13px;color:#94a3b8;">Español</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b0b5bf" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-6-6-6"/></svg>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── Botón guardar ── -->
+        <!-- ── Mis anuncios ── -->
         <div style="margin:16px 16px 0;">
-            <button onclick="saveProfile()" class="btn-primary" style="font-size:15px;letter-spacing:.01em;">
-                Guardar cambios
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <p style="font-size:15px;font-weight:700;color:#1a1a2e;">Mis anuncios</p>
+                <span id="my-products-count" style="font-size:12px;color:#94a3b8;"></span>
+            </div>
+            <div id="myProductsGrid" class="grid grid-cols-2" style="gap:12px;"></div>
+        </div>
+
+        <!-- ── Mis valoraciones ── -->
+        <div style="margin:16px 16px 0;background:#fff;border-radius:16px;overflow:hidden;">
+            <div style="padding:16px 18px 0;">
+                <p style="font-size:15px;font-weight:700;color:#1a1a2e;margin:0 0 12px;">Mis valoraciones</p>
+                <div style="display:flex;border-bottom:2px solid #f1f5f9;">
+                    <button id="rev-tab-seller" onclick="switchReviewTab('seller')"
+                        style="flex:1;padding:10px 0;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;font-family:inherit;color:var(--baltic);border-bottom:2.5px solid var(--baltic);margin-bottom:-2px;">
+                        Como vendedor
+                    </button>
+                    <button id="rev-tab-buyer" onclick="switchReviewTab('buyer')"
+                        style="flex:1;padding:10px 0;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;font-family:inherit;color:#94a3b8;border-bottom:2.5px solid transparent;margin-bottom:-2px;">
+                        Como comprador
+                    </button>
+                </div>
+            </div>
+            <div id="rev-panel-seller" style="padding:14px 18px 18px;">
+                <p id="rev-seller-empty" style="font-size:13px;color:#94a3b8;text-align:center;padding:16px 0;margin:0;">Aún no tienes valoraciones como vendedor</p>
+                <div id="rev-seller-list"></div>
+            </div>
+            <div id="rev-panel-buyer" style="padding:14px 18px 18px;display:none;">
+                <p id="rev-buyer-empty" style="font-size:13px;color:#94a3b8;text-align:center;padding:16px 0;margin:0;">Aún no tienes valoraciones como comprador</p>
+                <div id="rev-buyer-list"></div>
+            </div>
+        </div>
+
+        <!-- ── Información de cuenta (colapsable) ── -->
+        <div style="margin:16px 16px 0;background:#fff;border-radius:16px;overflow:hidden;">
+            <button onclick="toggleInfoSection()" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:16px 18px;background:none;border:none;cursor:pointer;font-family:inherit;">
+                <p style="font-size:11px;font-weight:700;color:#b0b5bf;letter-spacing:.06em;text-transform:uppercase;margin:0;">Información de cuenta</p>
+                <svg id="info-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b0b5bf" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                </svg>
             </button>
+            <div id="info-section-content" style="display:none;padding:0 18px 18px;">
+                <!-- Email -->
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px;">Email</label>
+                    <input type="email" id="prof-email" class="prof-input" readonly style="background:#f8fafc;color:#94a3b8;cursor:default;" placeholder="tu@correo.com">
+                </div>
+                <!-- Ubicación (solo lectura, editable desde modal) -->
+                <div style="margin-bottom:16px;">
+                    <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px;">Ubicación</label>
+                    <p id="prof-display-location" style="font-size:14px;color:#374151;padding:10px 12px;background:#f8fafc;border-radius:10px;border:1.5px solid #e2e8f0;min-height:42px;margin:0;">—</p>
+                </div>
+                <!-- Tipo de cuenta -->
+                <p style="font-size:11px;font-weight:700;color:#b0b5bf;letter-spacing:.06em;text-transform:uppercase;margin:0 0 12px;">Tipo de cuenta</p>
+                <div style="display:flex;gap:10px;margin-bottom:16px;">
+                    <div id="acct-personal" onclick="selectAccount('personal')" style="flex:1;border:2px solid var(--baltic);border-radius:12px;padding:12px;cursor:pointer;background:var(--baltic-light);">
+                        <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--baltic)" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                            <span style="font-size:12px;font-weight:700;color:var(--baltic);">Personal</span>
+                        </div>
+                        <p style="font-size:11px;color:#6b7280;line-height:1.4;margin:0;">Para vender objetos de segunda mano.</p>
+                    </div>
+                    <div id="acct-business" onclick="selectAccount('business')" style="flex:1;border:2px solid #e2e8f0;border-radius:12px;padding:12px;cursor:pointer;">
+                        <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 8v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                            <span style="font-size:12px;font-weight:700;color:#374151;">Negocio</span>
+                        </div>
+                        <p style="font-size:11px;color:#6b7280;line-height:1.4;margin:0;">Para vendedores profesionales.</p>
+                    </div>
+                </div>
+                <!-- Ajustes -->
+                <p style="font-size:11px;font-weight:700;color:#b0b5bf;letter-spacing:.06em;text-transform:uppercase;margin:0 0 10px;">Ajustes</p>
+                <div style="background:#f8fafc;border-radius:12px;overflow:hidden;border:1.5px solid #f1f5f9;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006994" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17H9a3 3 0 01-3-3V9a6 6 0 0112 0v5a3 3 0 01-3 3zM12 20v1"/></svg>
+                            <span style="font-size:13px;font-weight:500;color:#1a1a2e;">Notificaciones</span>
+                        </div>
+                        <div class="toggle-switch active" id="toggle-notif" onclick="toggleSwitch(this)"><div class="toggle-thumb"></div></div>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-top:1px solid #f1f5f9;">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006994" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            <span style="font-size:13px;font-weight:500;color:#1a1a2e;">Perfil público</span>
+                        </div>
+                        <div class="toggle-switch" id="toggle-public" onclick="toggleSwitch(this)"><div class="toggle-thumb"></div></div>
+                    </div>
+                </div>
+            </div>
         </div>
 
     </div>
@@ -581,6 +592,33 @@
 
 <!-- Sticky action bar del detalle de producto -->
 <div id="productActionBar"></div>
+
+<!-- ═══════════════════════════════
+     PERFIL PÚBLICO DEL VENDEDOR
+══════════════════════════════════ -->
+<div id="seller-profile-view" class="view">
+    <div class="max-w-md mx-auto">
+        <!-- Nav -->
+        <div class="sticky top-0 bg-white border-b border-slate-100 px-4 py-3 z-20 flex items-center gap-3">
+            <button onclick="closeSellerProfile()" class="text-slate-500">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/>
+                </svg>
+            </button>
+            <h2 class="font-semibold text-slate-900 text-base">Perfil del vendedor</h2>
+        </div>
+        <!-- Cabecera dinámica -->
+        <div id="seller-profile-header"></div>
+        <!-- Pestañas -->
+        <div class="sticky bg-white border-b border-slate-100 flex" style="top:53px;z-index:19;">
+            <button id="seller-tab-products" class="seller-tab-btn active" onclick="showSellerTab('products')">En venta</button>
+            <button id="seller-tab-reviews"  class="seller-tab-btn"        onclick="showSellerTab('reviews')">Valoraciones</button>
+        </div>
+        <!-- Contenido de las pestañas -->
+        <div id="seller-products-tab" class="seller-prod-grid"></div>
+        <div id="seller-reviews-tab"  style="display:none; padding-top:14px;"></div>
+    </div>
+</div>
 
 <!-- ═══════════════════════════════
      CHAT INDIVIDUAL
@@ -965,12 +1003,19 @@ let isLoggedIn        = false;
 let currentUser       = null;
 let pendingAction     = null;
 let currentTab        = 'home';
-let currentChatId              = null;   // UUID del otro usuario en el chat activo
-let currentChatUser            = null;   // { id, name, avatar } del otro usuario
-let currentChatProductId       = null;   // DB id del producto que origina la conversación
-let currentChatProductPrice    = null;   // precio formateado del producto activo
-let currentChatProductSellerId = null;   // seller_id del producto (para determinar rol)
-let currentChatProductStatus   = null;   // status del producto activo ('available','reserved'…)
+let currentChatId              = null;
+let currentChatUser            = null;
+let currentChatProductId       = null;
+let currentChatProductPrice    = null;
+let currentChatProductSellerId = null;
+let currentChatProductStatus   = null;
+let currentChatUserReviewed    = false;
+let reviewContext               = 'to_seller';
+let reviewTargetName            = '';
+let pendingRating               = 0;
+let pendingReviewProduct        = null;
+let pendingReviewCtx            = null;
+let pendingReviewTarget         = null;
 let chatMessages         = [];     // mensajes del chat activo
 let chatSubscription     = null;   // canal realtime activo
 let selectedCondition = '';
@@ -999,13 +1044,9 @@ sb.auth.onAuthStateChange(function(event, session) {
             if (document.getElementById('auth-view').classList.contains('active')) {
                 hideAuthView();
             }
-            if (pendingAction) {
-                var action = pendingAction;
-                pendingAction = null;
-                action();
-            } else {
-                showTab('home');
-            }
+            pendingAction = null;
+            showTab('home');
+            setTimeout(checkPendingReviews, 1800);
         }
         // INITIAL_SESSION: página recargada, cargamos el perfil del usuario actual
         if (event === 'INITIAL_SESSION') {
@@ -1040,8 +1081,10 @@ function ensureProfileName(user) {
                 .then(function(res) {
                     if (res.error) { console.error('[ensureProfileName] upsert FAILED', res.error); return; }
                     console.log('[ensureProfileName] OK — username guardado:', nameFromMeta);
-                    var el = document.getElementById('prof-username');
-                    if (el) el.value = nameFromMeta;
+                    var el = document.getElementById('prof-display-name');
+                    if (el) el.textContent = nameFromMeta;
+                    var epEl = document.getElementById('ep-username');
+                    if (epEl) epEl.value = nameFromMeta;
                 });
         });
 }
@@ -1054,8 +1097,10 @@ function applyUserToUI(user) {
 
     var meta = user.user_metadata || {};
     var name = meta.full_name || meta.name || user.email.split('@')[0];
-    var usernameEl = document.getElementById('prof-username');
-    if (usernameEl) usernameEl.value = name;   // always overwrite — not just if empty
+    var usernameEl = document.getElementById('prof-display-name');
+    if (usernameEl) usernameEl.textContent = name;
+    var epU = document.getElementById('ep-username');
+    if (epU) epU.value = name;
     if (initEl) initEl.textContent = name.charAt(0).toUpperCase();
     var emailEl = document.getElementById('prof-email');
     if (emailEl) emailEl.value = user.email || '';
@@ -1070,17 +1115,19 @@ function clearUserUI() {
     var avatarInp = document.getElementById('avatarInput');
     if (avatarInp) avatarInp.value = '';
 
-    ['prof-username', 'prof-bio', 'prof-location', 'prof-email'].forEach(function(id) {
+    ['prof-email', 'ep-username', 'ep-bio', 'ep-location'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.value = '';
     });
+    var dn = document.getElementById('prof-display-name');     if (dn) dn.textContent = '';
+    var db = document.getElementById('prof-display-bio');      if (db) { db.textContent = ''; db.style.display = 'none'; }
+    var dl = document.getElementById('prof-display-location'); if (dl) dl.textContent = '—';
 }
 
 /* ══════════════════
    ESTRELLAS
 ══════════════════ */
 function renderStars(rating) {
-    if (!rating) return '';
     var html = '';
     for (var i = 1; i <= 5; i++) {
         var full = rating >= i;
@@ -1108,66 +1155,95 @@ function loadProfile() {
     // Datos de auth como base inmediata
     applyUserToUI(currentUser);
 
-    // Buscar fila en profiles
-    sb.from('profiles')
-        .select('username, bio, location, rating, sales_count, avatar_url')
-        .eq('id', currentUser.id)
-        .maybeSingle()
-        .then(function(result) {
-            var p = result.data || {};
+    // Cargar perfil y reseñas en paralelo
+    Promise.all([
+        sb.from('profiles')
+            .select('username, bio, location, avatar_url')
+            .eq('id', currentUser.id)
+            .maybeSingle(),
+        sb.from('reviews').select('rating, comment, created_at')
+            .eq('reviewee_id', currentUser.id).eq('type', 'to_seller')
+            .order('created_at', { ascending: false }),
+        sb.from('reviews').select('rating, comment, created_at')
+            .eq('reviewee_id', currentUser.id).eq('type', 'to_buyer')
+            .order('created_at', { ascending: false })
+    ]).then(function(results) {
+        var p              = results[0].data || {};
+        var sellerReviews  = results[1].data || [];
+        var buyerReviews   = results[2].data || [];
+        var reviews        = sellerReviews;  // alias for star calc below
 
-            // Username: DB > auth metadata > email prefix
-            var meta = currentUser.user_metadata || {};
-            var name = p.username || meta.full_name || meta.name || currentUser.email.split('@')[0];
-            var usernameEl = document.getElementById('prof-username');
-            if (usernameEl) usernameEl.value = name;
+        // Username: DB > auth metadata > email prefix
+        var meta = currentUser.user_metadata || {};
+        var name = p.username || meta.full_name || meta.name || currentUser.email.split('@')[0];
 
-            var initialEl = document.getElementById('avatarInitial');
-            if (initialEl) initialEl.textContent = name.charAt(0).toUpperCase();
+        // Display elements
+        var nameDisplayEl = document.getElementById('prof-display-name');
+        if (nameDisplayEl) nameDisplayEl.textContent = name;
 
-            // Avatar: always show initial first, then replace with photo if exists
-            if (initialEl) initialEl.style.display = 'block';
-            var imgEl = document.getElementById('avatarImg');
-            if (p.avatar_url) {
-                if (imgEl) {
-                    // Cache-buster: force browser to fetch fresh image for this session
-                    imgEl.src = p.avatar_url + '?t=' + Date.now();
-                    imgEl.style.display = 'block';
-                    if (initialEl) initialEl.style.display = 'none';
-                }
-            } else {
-                if (imgEl) { imgEl.src = ''; imgEl.style.display = 'none'; }
+        var bioDisplayEl = document.getElementById('prof-display-bio');
+        if (bioDisplayEl) {
+            bioDisplayEl.textContent = p.bio || '';
+            bioDisplayEl.style.display = p.bio ? 'block' : 'none';
+        }
+
+        var locDisplayEl = document.getElementById('prof-display-location');
+        if (locDisplayEl) locDisplayEl.textContent = p.location || '—';
+
+        // Modal inputs (pre-populate for when user opens edit modal)
+        var epUsername = document.getElementById('ep-username');
+        if (epUsername) epUsername.value = name;
+        var epBio = document.getElementById('ep-bio');
+        if (epBio) epBio.value = p.bio || '';
+        var epLocation = document.getElementById('ep-location');
+        if (epLocation) epLocation.value = p.location || '';
+
+        var initialEl = document.getElementById('avatarInitial');
+        if (initialEl) initialEl.textContent = name.charAt(0).toUpperCase();
+
+        // Avatar (main profile card)
+        if (initialEl) initialEl.style.display = 'block';
+        var imgEl = document.getElementById('avatarImg');
+        if (p.avatar_url) {
+            if (imgEl) {
+                imgEl.src = p.avatar_url + '?t=' + Date.now();
+                imgEl.style.display = 'block';
+                if (initialEl) initialEl.style.display = 'none';
             }
+        } else {
+            if (imgEl) { imgEl.src = ''; imgEl.style.display = 'none'; }
+        }
 
-            // Bio
-            var bioEl = document.getElementById('prof-bio');
-            if (bioEl) bioEl.value = p.bio || '';
+        // Estrellas calculadas en tiempo real desde reviews
+        var count = reviews.length;
+        var avg   = count > 0
+            ? reviews.reduce(function(s, r) { return s + (r.rating || 0); }, 0) / count
+            : 0;
+        var starsEl  = document.getElementById('prof-stars');
+        var ratingEl = document.getElementById('prof-rating-num');
+        var salesEl  = document.getElementById('prof-sales');
+        if (starsEl)  starsEl.innerHTML    = renderStars(avg);
+        if (ratingEl) ratingEl.textContent = count > 0 ? ' (' + count + ')' : '';
+        if (salesEl)  salesEl.textContent  = '';
 
-            // Location
-            var locEl = document.getElementById('prof-location');
-            if (locEl) locEl.value = p.location || '';
+        // Member since
+        var sinceEl = document.getElementById('prof-since');
+        if (sinceEl) {
+            var sinceDate = currentUser.created_at;
+            sinceEl.textContent = sinceDate ? '· Desde ' + new Date(sinceDate).getFullYear() : '';
+        }
 
-            // Stars + rating
-            var starsEl  = document.getElementById('prof-stars');
-            var ratingEl = document.getElementById('prof-rating-num');
-            if (starsEl)  starsEl.innerHTML = p.rating ? renderStars(p.rating) : renderStars(0);
-            if (ratingEl) ratingEl.textContent = p.rating ? p.rating.toFixed(1) : 'Sin valoraciones';
+        // Email
+        var emailEl = document.getElementById('prof-email');
+        if (emailEl) emailEl.value = currentUser.email || '';
 
-            // Sales count
-            var salesEl = document.getElementById('prof-sales');
-            if (salesEl) salesEl.textContent = p.sales_count ? '· ' + p.sales_count + ' ventas' : '';
+        // Renderizar valoraciones en la sección de perfil
+        renderProfileReviews(sellerReviews, 'rev-seller-list', 'rev-seller-empty');
+        renderProfileReviews(buyerReviews,  'rev-buyer-list',  'rev-buyer-empty');
 
-            // Member since
-            var sinceEl = document.getElementById('prof-since');
-            if (sinceEl) {
-                var sinceDate = currentUser.created_at;
-                sinceEl.textContent = sinceDate ? '· Desde ' + new Date(sinceDate).getFullYear() : '';
-            }
-
-            // Email
-            var emailEl = document.getElementById('prof-email');
-            if (emailEl) emailEl.value = currentUser.email || '';
-        });
+        // Cargar mis anuncios
+        loadMyProducts();
+    });
 }
 
 /* ══════════════════
@@ -1350,6 +1426,128 @@ function showTab(tab) {
 /* ══════════════════
    PRODUCTO
 ══════════════════ */
+/* ══════════════════════════════
+   PERFIL PÚBLICO DEL VENDEDOR
+══════════════════════════════ */
+var currentSellerId = null;
+
+function openSellerProfile(sellerId) {
+    if (!sellerId) return;
+    currentSellerId = sellerId;
+
+    document.getElementById('seller-profile-header').innerHTML =
+        '<p style="text-align:center;padding:48px 0;font-size:13px;color:#b0b5bf;">Cargando…</p>';
+    document.getElementById('seller-products-tab').innerHTML = '';
+    document.getElementById('seller-reviews-tab').innerHTML  = '';
+    showSellerTab('products');
+
+    document.getElementById('seller-profile-view').classList.add('active');
+    document.getElementById('bottom-nav').style.display = 'none';
+
+    Promise.all([
+        sb.from('profiles').select('username, avatar_url, location').eq('id', sellerId).maybeSingle(),
+        sb.from('products').select('id, title, image_url, price, status').eq('seller_id', sellerId).eq('status', 'available').order('created_at', { ascending: false }),
+        sb.from('reviews').select('rating, comment, created_at').eq('seller_id', sellerId).order('created_at', { ascending: false })
+    ]).then(function(res) {
+        var prof     = res[0].data || {};
+        var products = res[1].data || [];
+        var reviews  = res[2].data || [];
+
+        var name  = prof.username || 'Vendedor';
+        var init  = name.charAt(0).toUpperCase();
+        var count = reviews.length;
+        var avg   = count > 0 ? reviews.reduce(function(s, r) { return s + (r.rating || 0); }, 0) / count : 0;
+
+        var avatarHtml = prof.avatar_url
+            ? '<img src="' + prof.avatar_url + '" style="width:76px;height:76px;border-radius:50%;object-fit:cover;border:3px solid var(--baltic-light);">'
+            : '<div style="width:76px;height:76px;border-radius:50%;background:var(--baltic);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:30px;">' + init + '</div>';
+
+        document.getElementById('seller-profile-header').innerHTML =
+            '<div style="display:flex;flex-direction:column;align-items:center;padding:28px 16px 22px;background:#fff;">' +
+                avatarHtml +
+                '<h2 style="font-size:19px;font-weight:800;color:#1a1a2e;margin-top:11px;letter-spacing:-.01em;">' + escapeHtml(name) + '</h2>' +
+                (prof.location ? '<p style="font-size:12px;color:#94a3b8;margin-top:3px;display:flex;align-items:center;gap:4px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>' + escapeHtml(prof.location) + '</p>' : '') +
+                '<div style="display:flex;align-items:center;gap:5px;margin-top:9px;">' +
+                    '<div style="display:inline-flex;gap:1px;">' + renderStars(avg) + '</div>' +
+                    (count > 0 ? '<span style="font-size:13px;font-weight:700;color:#1a1a2e;">' + avg.toFixed(1) + '</span>' : '') +
+                    '<span style="font-size:12px;color:#94a3b8;">(' + count + ' valoraciones)</span>' +
+                '</div>' +
+            '</div>';
+
+        // ── Pestaña productos ──
+        var pgrid = document.getElementById('seller-products-tab');
+        if (products.length === 0) {
+            pgrid.style.display = 'block';
+            pgrid.innerHTML = '<p style="grid-column:span 2;text-align:center;padding:48px 0;font-size:13px;color:#b0b5bf;">Este vendedor no tiene artículos en venta ahora mismo.</p>';
+        } else {
+            pgrid.style.display = 'grid';
+            pgrid.innerHTML = '';
+            products.forEach(function(p) {
+                var priceLabel = p.price != null ? 'S/ ' + Number(p.price).toLocaleString('es-PE') : '';
+                var card = document.createElement('div');
+                card.className = 'seller-prod-card';
+                card.innerHTML =
+                    '<img src="' + (p.image_url || '') + '" alt="' + escapeHtml(p.title || '') + '" onerror="this.src=PLACEHOLDER">' +
+                    '<div style="padding:8px 10px 10px;">' +
+                        '<p style="font-size:12px;font-weight:500;color:#1a1a2e;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + escapeHtml(p.title || '') + '</p>' +
+                        '<p style="font-size:14px;font-weight:800;color:var(--baltic);margin-top:4px;">' + priceLabel + '</p>' +
+                    '</div>';
+                card.onclick = function() {
+                    PRODUCTS[p.id] = {
+                        title: p.title, price: priceLabel, raw_price: p.price || 0,
+                        image: p.image_url || '', desc: '', location: prof.location || '',
+                        seller: name, seller_id: sellerId, seller_avatar_url: prof.avatar_url || null,
+                        rating: avg, reviews: count, category: '', condition: '',
+                        status: p.status || 'available', db_id: p.id
+                    };
+                    openProduct(p.id);
+                };
+                pgrid.appendChild(card);
+            });
+        }
+
+        // ── Pestaña valoraciones ──
+        var rlist = document.getElementById('seller-reviews-tab');
+        if (reviews.length === 0) {
+            rlist.innerHTML =
+                '<div style="text-align:center;padding:52px 24px;">' +
+                    '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.3" style="margin:0 auto 16px;display:block;"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>' +
+                    '<p style="font-size:15px;font-weight:700;color:#374151;margin-bottom:6px;">Sin valoraciones aún</p>' +
+                    '<p style="font-size:13px;color:#94a3b8;line-height:1.6;">Este vendedor aún no tiene valoraciones.<br>¡Sé el primero en comprarle!</p>' +
+                '</div>';
+        } else {
+            rlist.innerHTML = '';
+            reviews.forEach(function(r) {
+                var card = document.createElement('div');
+                card.className = 'review-card';
+                card.innerHTML =
+                    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">' +
+                        '<div style="display:inline-flex;gap:1px;">' + renderStars(r.rating || 0) + '</div>' +
+                        '<span style="font-size:11px;color:#b0b5bf;">' + formatRelTime(r.created_at) + '</span>' +
+                    '</div>' +
+                    (r.comment ? '<p style="font-size:13px;color:#374151;line-height:1.55;">' + escapeHtml(r.comment) + '</p>' : '<p style="font-size:12px;color:#b0b5bf;font-style:italic;">Sin comentario</p>');
+                rlist.appendChild(card);
+            });
+        }
+    });
+}
+
+function closeSellerProfile() {
+    document.getElementById('seller-profile-view').classList.remove('active');
+    var productOpen = document.getElementById('product-view').classList.contains('active');
+    if (!productOpen) document.getElementById('bottom-nav').style.display = 'flex';
+    currentSellerId = null;
+}
+
+function showSellerTab(tab) {
+    var pgrid = document.getElementById('seller-products-tab');
+    var rlist = document.getElementById('seller-reviews-tab');
+    pgrid.style.display = tab === 'products' ? (pgrid.children.length === 1 && pgrid.firstChild && pgrid.firstChild.tagName === 'P' ? 'block' : 'grid') : 'none';
+    rlist.style.display = tab === 'reviews'  ? 'block' : 'none';
+    document.getElementById('seller-tab-products').classList.toggle('active', tab === 'products');
+    document.getElementById('seller-tab-reviews').classList.toggle('active',  tab === 'reviews');
+}
+
 function openProduct(id) {
     var p = PRODUCTS[id];
     if (!p) return;
@@ -1373,11 +1571,12 @@ function openProduct(id) {
                 '<p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Descripción</p>' +
                 '<p class="text-sm text-slate-600 leading-relaxed">' + p.desc + '</p>' +
             '</div>' +
-            '<div class="bg-slate-50 rounded-xl p-4 flex items-center gap-3">' +
+            '<div class="bg-slate-50 rounded-xl p-4 flex items-center gap-3" style="cursor:pointer;" onclick="openSellerProfile(\'' + (p.seller_id || '') + '\')">' +
                 sellerAv +
-                '<div>' +
-                    '<p class="font-semibold text-slate-900 text-sm">' + p.seller + '</p>' +
+                '<div style="flex:1;min-width:0;">' +
+                    '<p class="font-semibold text-slate-900 text-sm">' + escapeHtml(p.seller) + '</p>' +
                     '<p class="stars text-sm">' + stars + ' <span class="text-slate-400 text-xs font-normal">' + p.rating + ' (' + p.reviews + ' reseñas)</span></p>' +
+                    '<p style="font-size:11px;color:var(--baltic);font-weight:500;margin-top:2px;">Ver perfil →</p>' +
                 '</div>' +
             '</div>' +
         '</div>';
@@ -1499,8 +1698,13 @@ function openChat(otherId, otherName, otherAvatar, productId, productTitle, prod
         sellerRow.style.display = sellerIsOther ? 'flex' : 'none';
 
         // Renderizar botones según rol + estado del producto
+        currentChatUserReviewed = false;
         var amSeller = !!(productSellerId && currentUser && productSellerId === currentUser.id);
-        renderChatProductButtons(amSeller, currentChatProductStatus);
+        if (currentChatProductStatus === 'sold') {
+            checkReviewStatus(productId);  // sets currentChatUserReviewed then renders
+        } else {
+            renderChatProductButtons(amSeller, currentChatProductStatus);
+        }
 
         hdr.classList.add('visible');
     } else {
@@ -1580,17 +1784,33 @@ function renderChatProductButtons(amSeller, status) {
     var sellerDiv = document.getElementById('chatProdSellerBtns');
     var buyerDiv  = document.getElementById('chatProdBuyerBtns');
     var isReserved = status === 'reserved';
+    var isSold     = status === 'sold';
 
     if (amSeller) {
         buyerDiv.style.display  = 'none';
         sellerDiv.style.display = 'flex';
-        if (isReserved) {
+        if (isSold) {
+            if (currentChatUserReviewed) {
+                sellerDiv.innerHTML =
+                    '<div style="flex:1;text-align:center;padding:9px 6px;border-radius:10px;' +
+                        'background:#f1f5f9;border:1.5px solid #cbd5e1;font-size:12.5px;' +
+                        'font-weight:700;color:#64748b;">' +
+                        'Ya has valorado ✓' +
+                    '</div>';
+            } else {
+                sellerDiv.innerHTML =
+                    '<button class="chat-prod-btn" onclick="openSellerReviewModal()" ' +
+                        'style="border:none;background:var(--baltic);color:#fff;flex:1;">' +
+                        'Valorar al comprador' +
+                    '</button>';
+            }
+        } else if (isReserved) {
             sellerDiv.innerHTML =
                 '<button class="chat-prod-btn" onclick="unreserveProduct()" ' +
                     'style="border:1.5px solid #d97706;color:#d97706;background:#fff;">' +
                     'Deshacer reserva' +
                 '</button>' +
-                '<button class="chat-prod-btn" onclick="markAsSold()" ' +
+                '<button class="chat-prod-btn" onclick="openSellerReviewModal()" ' +
                     'style="border:none;background:#16a34a;color:#fff;">' +
                     'Vendido' +
                 '</button>';
@@ -1600,7 +1820,7 @@ function renderChatProductButtons(amSeller, status) {
                     'style="border:1.5px solid var(--baltic);color:var(--baltic);background:#fff;">' +
                     'Reservar' +
                 '</button>' +
-                '<button class="chat-prod-btn" onclick="markAsSold()" ' +
+                '<button class="chat-prod-btn" onclick="openSellerReviewModal()" ' +
                     'style="border:none;background:#16a34a;color:#fff;">' +
                     'Vendido' +
                 '</button>';
@@ -1608,7 +1828,22 @@ function renderChatProductButtons(amSeller, status) {
     } else {
         sellerDiv.style.display = 'none';
         buyerDiv.style.display  = 'flex';
-        if (isReserved) {
+        if (isSold) {
+            if (currentChatUserReviewed) {
+                buyerDiv.innerHTML =
+                    '<div style="flex:1;text-align:center;padding:9px 6px;border-radius:10px;' +
+                        'background:#f1f5f9;border:1.5px solid #cbd5e1;font-size:12.5px;' +
+                        'font-weight:700;color:#64748b;">' +
+                        'Ya has valorado ✓' +
+                    '</div>';
+            } else {
+                buyerDiv.innerHTML =
+                    '<button class="chat-prod-btn" onclick="openBuyerReviewModal()" ' +
+                        'style="border:none;background:var(--baltic);color:#fff;flex:1;">' +
+                        'Valorar al vendedor' +
+                    '</button>';
+            }
+        } else if (isReserved) {
             buyerDiv.innerHTML =
                 '<div style="flex:1;text-align:center;padding:9px 6px;border-radius:10px;' +
                     'background:#fefce8;border:1.5px solid #D4AF37;font-size:12.5px;' +
@@ -1618,23 +1853,40 @@ function renderChatProductButtons(amSeller, status) {
         } else {
             buyerDiv.innerHTML =
                 '<button class="chat-prod-btn" onclick="openOfferModal()" ' +
-                    'style="border:1.5px solid var(--baltic);color:var(--baltic);background:#fff;">' +
-                    'Regatear' +
-                '</button>' +
-                '<button class="chat-prod-btn" onclick="sendMeetingMessage()" ' +
                     'style="border:none;background:var(--baltic);color:#fff;">' +
-                    'Pactar encuentro' +
+                    'Hacer oferta' +
                 '</button>';
         }
     }
 }
 
 /* ── Actualiza el status del producto activo en UI + catálogo ── */
+function checkReviewStatus(productId) {
+    if (!currentUser || !productId) { currentChatUserReviewed = false; return; }
+    sb.from('reviews')
+        .select('id')
+        .eq('product_id', productId)
+        .eq('reviewer_id', currentUser.id)
+        .maybeSingle()
+        .then(function(r) {
+            currentChatUserReviewed = !!(r.data);
+            if (currentChatProductStatus === 'sold') {
+                var amSeller = !!(currentChatProductSellerId && currentUser &&
+                                  currentChatProductSellerId === currentUser.id);
+                renderChatProductButtons(amSeller, 'sold');
+            }
+        });
+}
+
 function updateChatProductStatus(newStatus) {
     currentChatProductStatus = newStatus;
     var amSeller = !!(currentChatProductSellerId && currentUser &&
                       currentChatProductSellerId === currentUser.id);
-    renderChatProductButtons(amSeller, newStatus);
+    if (newStatus === 'sold') {
+        checkReviewStatus(currentChatProductId);  // renderChatProductButtons called in callback
+    } else {
+        renderChatProductButtons(amSeller, newStatus);
+    }
     fetchProducts();
 }
 
@@ -1657,20 +1909,56 @@ function submitOffer() {
         document.getElementById('offerPriceInput').focus();
         return;
     }
-    var title = document.getElementById('chatProdTitle').textContent;
-    var text  = 'Te hago una oferta de S/ ' + Number(priceRaw).toLocaleString('es-PE') +
-                (title ? ' por "' + title + '"' : '') + '. ¿Lo aceptas?';
     closeOfferModal();
-    document.getElementById('messageInput').value = text;
-    sendMessage();
+    var price = Number(priceRaw);
+    var text  = '__OFFER__:' + price;
+
+    var optimistic = { id: '_pending', sender_id: currentUser.id, content: text, created_at: new Date().toISOString(), read: false };
+    chatMessages.push(optimistic);
+    renderMessages(chatMessages);
+
+    var msgPayload = { sender_id: currentUser.id, receiver_id: currentChatId, content: text };
+    if (currentChatProductId) msgPayload.product_id = currentChatProductId;
+
+    sb.from('messages').insert(msgPayload).select().single().then(function(r) {
+        var idx = chatMessages.findIndex(function(m) { return m.id === '_pending'; });
+        if (idx !== -1) chatMessages[idx] = r.error ? optimistic : r.data;
+        renderMessages(chatMessages);
+    });
 }
 
-function sendMeetingMessage() {
-    var title = document.getElementById('chatProdTitle').textContent;
-    var text  = '¡Hola! Me interesa' + (title ? ' "' + title + '"' : ' el producto') +
-                '. ¿Cuándo y dónde podemos quedar para el intercambio?';
-    document.getElementById('messageInput').value = text;
-    sendMessage();
+function acceptOffer(offerId, price) {
+    var text = '__OFFER_ACCEPTED__:' + offerId + ':' + price;
+    var msgPayload = { sender_id: currentUser.id, receiver_id: currentChatId, content: text };
+    if (currentChatProductId) msgPayload.product_id = currentChatProductId;
+    sb.from('messages').insert(msgPayload).select().single().then(function(r) {
+        if (r.error) { console.error('[acceptOffer] FAILED', r.error); return; }
+        chatMessages.push(r.data);
+        renderMessages(chatMessages);
+    });
+}
+
+function rejectOffer(offerId, price) {
+    var text = '__OFFER_REJECTED__:' + offerId + ':' + price;
+    var msgPayload = { sender_id: currentUser.id, receiver_id: currentChatId, content: text };
+    if (currentChatProductId) msgPayload.product_id = currentChatProductId;
+    sb.from('messages').insert(msgPayload).select().single().then(function(r) {
+        if (r.error) { console.error('[rejectOffer] FAILED', r.error); return; }
+        chatMessages.push(r.data);
+        renderMessages(chatMessages);
+    });
+}
+
+function updateHeaderPrice(agreedPrice) {
+    var priceEl = document.getElementById('chatProdPrice');
+    if (!priceEl) return;
+    if (agreedPrice) {
+        priceEl.innerHTML =
+            '<span style="text-decoration:line-through;opacity:0.45;font-size:13px;font-weight:600;">' + escapeHtml(currentChatProductPrice || '') + '</span>' +
+            '&nbsp;<span style="color:#15803d;">S/ ' + Number(agreedPrice).toLocaleString('es-PE') + '</span>';
+    } else {
+        priceEl.textContent = currentChatProductPrice || '';
+    }
 }
 
 function reserveProduct() {
@@ -1812,11 +2100,82 @@ function renderMessages(messages) {
         container.innerHTML = '<p style="text-align:center;padding:32px 0;font-size:13px;color:#b0b5bf;">Di hola 👋</p>';
         return;
     }
+
+    // First pass: collect offer responses keyed by the original offer message ID
+    var offerResponses = {};   // offerId → 'accepted' | 'rejected'
+    var agreedPrice    = null;
     messages.forEach(function(msg) {
-        var isMe  = msg.sender_id === (currentUser && currentUser.id);
-        var text  = escapeHtml(msg.content || '');
-        var time  = formatRelTime(msg.created_at);
-        var wrap  = document.createElement('div');
+        var c = msg.content || '';
+        if (c.indexOf('__OFFER_ACCEPTED__:') === 0 || c.indexOf('__OFFER_REJECTED__:') === 0) {
+            var parts    = c.split(':');
+            var type     = parts[0];
+            var offerId  = parts[1];
+            var price    = parts[2];
+            offerResponses[offerId] = (type === '__OFFER_ACCEPTED__') ? 'accepted' : 'rejected';
+            if (type === '__OFFER_ACCEPTED__') agreedPrice = price;
+        }
+    });
+    updateHeaderPrice(agreedPrice);
+
+    var amSeller = !!(currentChatProductSellerId && currentUser && currentChatProductSellerId === currentUser.id);
+
+    messages.forEach(function(msg) {
+        var c    = msg.content || '';
+        var isMe = msg.sender_id === (currentUser && currentUser.id);
+        var time = formatRelTime(msg.created_at);
+        var wrap = document.createElement('div');
+
+        // Skip internal response messages — they are encoded in offerResponses, not shown as bubbles
+        if (c.indexOf('__OFFER_ACCEPTED__:') === 0 || c.indexOf('__OFFER_REJECTED__:') === 0) return;
+
+        // ── Offer card ──
+        if (c.indexOf('__OFFER__:') === 0) {
+            var offerPrice = c.slice('__OFFER__:'.length);
+            var response   = offerResponses[msg.id] || null;
+            var isPending  = !response;
+            var isAccepted = response === 'accepted';
+            var isRejected = response === 'rejected';
+
+            var cardBg   = isAccepted ? '#dcfce7' : isRejected ? '#fee2e2' : '#e6f3f8';
+            var priceClr = isAccepted ? '#15803d' : isRejected ? '#dc2626' : 'var(--baltic)';
+            var statusLabel = isAccepted ? 'Oferta Aceptada' : isRejected ? 'Oferta Rechazada' : '';
+
+            var buttonsHtml = '';
+            // Seller sees Accept/Reject only while pending and once the message has a real DB id
+            if (isPending && amSeller && msg.id && msg.id !== '_pending') {
+                buttonsHtml =
+                    '<div style="display:flex;gap:8px;margin-top:10px;">' +
+                        '<button onclick="rejectOffer(\'' + msg.id + '\',\'' + offerPrice + '\')" ' +
+                            'style="flex:1;padding:8px;border-radius:9px;border:1.5px solid #dc2626;color:#dc2626;' +
+                            'background:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">' +
+                            'Rechazar' +
+                        '</button>' +
+                        '<button onclick="acceptOffer(\'' + msg.id + '\',\'' + offerPrice + '\')" ' +
+                            'style="flex:1;padding:8px;border-radius:9px;border:none;background:#15803d;color:#fff;' +
+                            'font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">' +
+                            'Aceptar Oferta' +
+                        '</button>' +
+                    '</div>';
+            }
+
+            wrap.className = 'flex justify-center';
+            var card = document.createElement('div');
+            card.style.cssText = 'background:' + cardBg + ';border-radius:16px;padding:14px 18px;' +
+                'max-width:260px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06);';
+            card.innerHTML =
+                '<p style="font-size:11px;color:#64748b;font-weight:500;margin-bottom:4px;">' +
+                    (isMe ? 'Has enviado una oferta' : 'Oferta de compra') + '</p>' +
+                '<p style="font-size:22px;font-weight:800;color:' + priceClr + ';line-height:1.1;">S/ ' +
+                    Number(offerPrice).toLocaleString('es-PE') + '</p>' +
+                (statusLabel ? '<p style="font-size:12px;font-weight:700;color:' + priceClr + ';margin-top:5px;">' + statusLabel + '</p>' : '') +
+                buttonsHtml +
+                '<p style="font-size:10px;color:#b0b5bf;margin-top:8px;">' + time + '</p>';
+            wrap.appendChild(card);
+            container.appendChild(wrap);
+            return;
+        }
+
+        // ── Normal bubble ──
         wrap.className = 'flex ' + (isMe ? 'justify-end' : 'justify-start');
         var bubble = document.createElement('div');
         bubble.className = 'max-w-xs px-4 py-2 ' + (isMe ? 'bubble-me' : 'bubble-other');
@@ -1831,7 +2190,7 @@ function renderMessages(messages) {
             }
         }
         bubble.innerHTML =
-            '<p class="text-sm" style="word-break:break-word;">' + text + '</p>' +
+            '<p class="text-sm" style="word-break:break-word;">' + escapeHtml(c) + '</p>' +
             '<span class="text-xs mt-0.5 flex items-center gap-1' + (isMe ? ' justify-end' : '') + '">' +
                 '<span style="opacity:0.55">' + time + '</span>' + statusHtml +
             '</span>';
@@ -1958,6 +2317,10 @@ function renderConversationList(convos, profileMap, productMap) {
         var prodImg      = prod.image_url || null;
         var prodPrice    = prod.price != null ? 'S/ ' + Number(prod.price).toLocaleString('es-PE') : null;
         var prodSellerId = prod.seller_id || null;
+        var prodStatus   = prod.status   || 'available';
+        var isSoldConvo  = prodStatus === 'sold';
+        var amSellerConvo = !!(prodSellerId && currentUser && prodSellerId === currentUser.id);
+        var soldBadgeLabel = amSellerConvo ? 'Vendido' : 'Comprado';
 
         // Swipe wrapper
         var wrapper = document.createElement('div');
@@ -1975,11 +2338,17 @@ function renderConversationList(convos, profileMap, productMap) {
         // Content row
         var item = document.createElement('div');
         item.className = 'swipe-item flex items-center gap-3 px-5 py-4';
+        if (isSoldConvo) item.style.opacity = '0.6';
         var hasUnread    = c.unread > 0;
         var unreadLabel  = c.unread > 99 ? '99+' : String(c.unread);
         var previewColor = hasUnread ? '#1a1a2e' : '#94a3b8';
         var previewWeight= hasUnread ? '500'     : '400';
-        var previewText  = (c.lastSenderIsMe ? 'Tú: ' : '') + (c.preview || '');
+        var rawPreview = c.preview || '';
+        var friendlyPreview = rawPreview.indexOf('__OFFER_ACCEPTED__:') !== -1 ? '¡Oferta aceptada!'
+                            : rawPreview.indexOf('__OFFER_REJECTED__:') !== -1 ? 'Oferta rechazada'
+                            : rawPreview.indexOf('__OFFER__:')          !== -1 ? 'Propuesta de oferta'
+                            : rawPreview;
+        var previewText  = (c.lastSenderIsMe ? 'Tú: ' : '') + friendlyPreview;
 
         item.innerHTML =
             // Avatar
@@ -1990,12 +2359,14 @@ function renderConversationList(convos, profileMap, productMap) {
             '<div class="flex-1 min-w-0">' +
                 '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">' +
                     '<p class="font-semibold text-slate-900 text-sm truncate">' + escapeHtml(name) + '</p>' +
-                    // Columna derecha: hora + badge
+                    // Columna derecha: hora + badges
                     '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">' +
                         '<span style="font-size:11px;color:#b0b5bf;white-space:nowrap;">' + c.time + '</span>' +
-                        (hasUnread
-                            ? '<span style="background:var(--baltic);color:#fff;border-radius:99px;font-size:10px;font-weight:700;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;padding:0 5px;line-height:1;">' + unreadLabel + '</span>'
-                            : '') +
+                        (isSoldConvo
+                            ? '<span style="background:#e2e8f0;color:#475569;border-radius:99px;font-size:10px;font-weight:700;padding:2px 7px;line-height:1.4;">' + soldBadgeLabel + '</span>'
+                            : (hasUnread
+                                ? '<span style="background:var(--baltic);color:#fff;border-radius:99px;font-size:10px;font-weight:700;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;padding:0 5px;line-height:1;">' + unreadLabel + '</span>'
+                                : '')) +
                     '</div>' +
                 '</div>' +
                 // Etiqueta del producto
@@ -2345,6 +2716,7 @@ function buildCard(p, idOrKey) {
                 (imageUrl ? ' onerror="this.onerror=null;this.src=PLACEHOLDER"' : '') + '>' +
             condBadge(p.condition) +
             (p.status === 'reserved' ? '<div class="product-badge reserved">RESERVADO</div>' : '') +
+            (p.status === 'sold'     ? '<div class="product-badge sold">VENDIDO</div>' : '') +
             '<button class="card-fav' + (isFav ? ' fav-active' : '') + '" data-key="' + idOrKey + '" onclick="toggleFav(event,' + keyJs + ',this)">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
                     '<path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>' +
@@ -2505,6 +2877,7 @@ function fetchProducts() {
 
     sb.from('products')
         .select('*')
+        .eq('status', 'available')
         .order('created_at', { ascending: false })
         .then(function(result) {
             if (result.error) {
@@ -2587,6 +2960,7 @@ function openEdit(id) {
 function closePublish() {
     document.getElementById('publish-overlay').classList.remove('open');
     document.body.style.overflow = '';
+    resetPublishForm();
 }
 
 function handleOverlayClick(e) {
@@ -2613,10 +2987,26 @@ function handlePhotos(e) {
         publishPhotos.push(file);
         var reader = new FileReader();
         reader.onload = function(ev) {
+            var wrap = document.createElement('div');
+            wrap.className = 'photo-thumb-wrap';
+
             var img = document.createElement('img');
             img.src = ev.target.result;
             img.className = 'photo-thumb';
-            area.insertBefore(img, document.getElementById('addPhotoBtn'));
+
+            var del = document.createElement('button');
+            del.className = 'photo-thumb-del';
+            del.type = 'button';
+            del.textContent = '×';
+            del.onclick = function() {
+                var idx = publishPhotos.indexOf(file);
+                if (idx !== -1) publishPhotos.splice(idx, 1);
+                wrap.remove();
+            };
+
+            wrap.appendChild(img);
+            wrap.appendChild(del);
+            area.insertBefore(wrap, document.getElementById('addPhotoBtn'));
         };
         reader.readAsDataURL(file);
     });
@@ -2646,7 +3036,7 @@ function resetPublishForm() {
     selectedCondition = '';
     editingProductId = null;
     document.getElementById('photoPreviewArea')
-        .querySelectorAll('.photo-thumb').forEach(function(img) { img.remove(); });
+        .querySelectorAll('.photo-thumb-wrap').forEach(function(w) { w.remove(); });
     document.getElementById('photoInput').value = '';
     // Restore modal title and button for next publish
     document.querySelector('#publish-sheet h2').textContent = 'Publicar objeto';
@@ -2826,18 +3216,140 @@ function toggleSwitch(el) {
     el.classList.toggle('active');
 }
 
-function previewAvatar(e) {
+function previewEditAvatar(e) {
     var file = e.target.files[0];
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function(ev) {
-        var img = document.getElementById('avatarImg');
-        var initial = document.getElementById('avatarInitial');
-        img.src = ev.target.result;
-        img.style.display = 'block';
-        initial.style.display = 'none';
+        // Modal preview
+        var epImg  = document.getElementById('ep-avatar-img');
+        var epInit = document.getElementById('ep-avatar-initial');
+        if (epImg)  { epImg.src = ev.target.result; epImg.style.display = 'block'; }
+        if (epInit) epInit.style.display = 'none';
+        // Main profile card preview
+        var mainImg  = document.getElementById('avatarImg');
+        var mainInit = document.getElementById('avatarInitial');
+        if (mainImg)  { mainImg.src = ev.target.result; mainImg.style.display = 'block'; }
+        if (mainInit) mainInit.style.display = 'none';
     };
     reader.readAsDataURL(file);
+}
+
+function openEditProfile() {
+    // Sync modal from current display values
+    var nameEl = document.getElementById('prof-display-name');
+    var bioEl  = document.getElementById('prof-display-bio');
+    var locEl  = document.getElementById('prof-display-location');
+    var epU = document.getElementById('ep-username');
+    var epB = document.getElementById('ep-bio');
+    var epL = document.getElementById('ep-location');
+    if (epU && nameEl) epU.value = nameEl.textContent || '';
+    if (epB && bioEl)  epB.value = bioEl.textContent  || '';
+    if (epL && locEl)  epL.value = (locEl.textContent === '—') ? '' : (locEl.textContent || '');
+
+    // Sync avatar preview in modal
+    var mainImg  = document.getElementById('avatarImg');
+    var mainInit = document.getElementById('avatarInitial');
+    var epImg    = document.getElementById('ep-avatar-img');
+    var epInit   = document.getElementById('ep-avatar-initial');
+    if (mainImg && mainImg.style.display !== 'none' && mainImg.src) {
+        epImg.src = mainImg.src; epImg.style.display = 'block'; epInit.style.display = 'none';
+    } else {
+        epImg.style.display = 'none'; epImg.src = '';
+        epInit.textContent  = mainInit ? mainInit.textContent : '?';
+        epInit.style.display = 'flex';
+    }
+
+    document.getElementById('edit-profile-modal').classList.remove('hidden');
+    setTimeout(function() { document.getElementById('ep-username').focus(); }, 80);
+}
+
+function closeEditProfile() {
+    document.getElementById('edit-profile-modal').classList.add('hidden');
+}
+
+function toggleInfoSection() {
+    var content = document.getElementById('info-section-content');
+    var chevron = document.getElementById('info-chevron');
+    var isOpen  = content.style.display !== 'none';
+    content.style.display  = isOpen ? 'none' : 'block';
+    if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+
+function renderProfileReviews(reviews, listId, emptyId) {
+    var listEl  = document.getElementById(listId);
+    var emptyEl = document.getElementById(emptyId);
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    if (!reviews || reviews.length === 0) {
+        if (emptyEl) emptyEl.style.display = 'block';
+        return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+    reviews.forEach(function(r) {
+        var stars = '';
+        for (var i = 1; i <= 5; i++) stars += i <= r.rating ? '★' : '☆';
+        var date = r.created_at ? new Date(r.created_at).toLocaleDateString('es-PE', { day:'numeric', month:'short', year:'numeric' }) : '';
+        var card = document.createElement('div');
+        card.style.cssText = 'border-radius:12px;border:1.5px solid #f1f5f9;padding:12px 14px;margin-bottom:10px;';
+        card.innerHTML =
+            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">' +
+                '<span style="color:var(--baltic);font-size:16px;letter-spacing:1px;">' + stars + '</span>' +
+                '<span style="font-size:11px;color:#b0b5bf;">' + date + '</span>' +
+            '</div>' +
+            (r.comment ? '<p style="font-size:13px;color:#374151;line-height:1.5;margin:0;">' + escapeHtml(r.comment) + '</p>' : '');
+        listEl.appendChild(card);
+    });
+}
+
+function switchReviewTab(tab) {
+    document.getElementById('rev-panel-seller').style.display = tab === 'seller' ? 'block' : 'none';
+    document.getElementById('rev-panel-buyer').style.display  = tab === 'buyer'  ? 'block' : 'none';
+    document.getElementById('rev-tab-seller').style.color = tab === 'seller' ? 'var(--baltic)' : '#94a3b8';
+    document.getElementById('rev-tab-buyer').style.color  = tab === 'buyer'  ? 'var(--baltic)' : '#94a3b8';
+    document.getElementById('rev-tab-seller').style.borderBottomColor = tab === 'seller' ? 'var(--baltic)' : 'transparent';
+    document.getElementById('rev-tab-buyer').style.borderBottomColor  = tab === 'buyer'  ? 'var(--baltic)' : 'transparent';
+}
+
+function loadMyProducts() {
+    if (!currentUser) return;
+    var grid    = document.getElementById('myProductsGrid');
+    var countEl = document.getElementById('my-products-count');
+    if (!grid) return;
+    grid.innerHTML = '<p style="grid-column:span 2;text-align:center;padding:32px 0;font-size:13px;color:#b0b5bf;">Cargando…</p>';
+
+    sb.from('products')
+        .select('*')
+        .eq('seller_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .then(function(r) {
+            grid.innerHTML = '';
+            if (r.error) return;
+            var products = r.data || [];
+            if (countEl) countEl.textContent = products.length > 0 ? products.length + (products.length === 1 ? ' anuncio' : ' anuncios') : '';
+            if (products.length === 0) {
+                grid.innerHTML =
+                    '<div style="grid-column:span 2;text-align:center;padding:32px 16px;">' +
+                        '<p style="font-size:13px;color:#94a3b8;margin-bottom:14px;">Aún no tienes anuncios publicados</p>' +
+                        '<button onclick="openPublish()" class="btn-primary" style="font-size:14px;padding:10px 24px;">Publicar mi primer anuncio</button>' +
+                    '</div>';
+                return;
+            }
+            products.forEach(function(p) {
+                var key = 'db_' + p.id;
+                PRODUCTS[key] = {
+                    title: p.title, price: 'S/ ' + (typeof p.price === 'number' ? p.price.toLocaleString('es-PE') : p.price),
+                    raw_price: typeof p.price === 'number' ? p.price : parseFloat((p.price||'0').replace(/[^0-9.]/g,''))||0,
+                    image: p.image_url||'', image_url: p.image_url||'', desc: p.description||'',
+                    location: p.location||'', seller: 'Yo', seller_id: p.seller_id||null,
+                    seller_avatar_url: null, rating: 0, reviews: 0,
+                    category: p.category||'', condition: p.condition||'',
+                    status: p.status||'available', db_id: p.id||null
+                };
+                var card = buildCard(PRODUCTS[key], key);
+                grid.appendChild(card);
+            });
+        });
 }
 
 function previewCover(e) {
@@ -2855,10 +3367,10 @@ function previewCover(e) {
 
 function saveProfile() {
     if (!currentUser) return;
-    var btn      = event.currentTarget;
-    var username = (document.getElementById('prof-username').value || '').trim();
-    var bio      = (document.getElementById('prof-bio').value      || '').trim();
-    var location = (document.getElementById('prof-location').value || '').trim();
+    var btn      = document.getElementById('ep-save-btn');
+    var username = (document.getElementById('ep-username').value || '').trim();
+    var bio      = (document.getElementById('ep-bio').value      || '').trim();
+    var location = (document.getElementById('ep-location').value || '').trim();
 
     btn.textContent   = 'Guardando...';
     btn.style.opacity = '.7';
@@ -2886,19 +3398,30 @@ function saveProfile() {
                     '| full:', result.error);
                 btn.textContent      = 'Error al guardar';
                 btn.style.background = '#dc2626';
+                setTimeout(function() { btn.textContent = 'Guardar cambios'; btn.style.background = 'var(--baltic)'; }, 2500);
             } else {
                 console.log('[upsert/profiles] OK — avatar_url saved:', avatarUrl || '(sin cambio)');
-                btn.textContent      = '✓ Cambios guardados';
-                btn.style.background = '#16a34a';
+                // Update display elements immediately
+                var nameEl = document.getElementById('prof-display-name');
+                if (nameEl && username) nameEl.textContent = username;
+                var bioEl = document.getElementById('prof-display-bio');
+                if (bioEl) { bioEl.textContent = bio; bioEl.style.display = bio ? 'block' : 'none'; }
+                var locEl = document.getElementById('prof-display-location');
+                if (locEl) locEl.textContent = location || '—';
                 if (username) {
                     var initEl = document.getElementById('avatarInitial');
                     if (initEl) initEl.textContent = username.charAt(0).toUpperCase();
+                    var epInitEl = document.getElementById('ep-avatar-initial');
+                    if (epInitEl) epInitEl.textContent = username.charAt(0).toUpperCase();
                 }
+                btn.textContent      = '✓ Guardado';
+                btn.style.background = '#16a34a';
+                setTimeout(function() {
+                    btn.textContent      = 'Guardar cambios';
+                    btn.style.background = 'var(--baltic)';
+                    closeEditProfile();
+                }, 1200);
             }
-            setTimeout(function() {
-                btn.textContent      = 'Guardar cambios';
-                btn.style.background = 'var(--baltic)';
-            }, 2500);
         });
     }
 
@@ -2954,11 +3477,17 @@ document.addEventListener('keydown', function(e) {
     if (document.getElementById('publish-overlay').classList.contains('open')) {
         closePublish(); return;
     }
+    if (document.getElementById('seller-profile-view').classList.contains('active')) {
+        closeSellerProfile(); return;
+    }
     if (document.getElementById('product-view').classList.contains('active')) {
         closeProduct(); return;
     }
     if (document.getElementById('chat-view').classList.contains('active')) {
         closeChat(); return;
+    }
+    if (!document.getElementById('edit-profile-modal').classList.contains('hidden')) {
+        closeEditProfile(); return;
     }
     if (document.getElementById('auth-view').classList.contains('active')) {
         goBackFromAuth(); return;
@@ -2980,77 +3509,265 @@ sb.auth.getSession().then(function(result) {
         applyUserToUI(currentUser);
         fetchUserFavorites();
         if (currentTab === 'profile') loadProfile();
+        setTimeout(checkPendingReviews, 1800);
     }
 });
-</script>
-let currentRating = 0;
+
+/* ── Modal de valoración ── */
+let currentRating    = 0;
 let productBeingSold = null;
 
-function openReviewModal(productId) {
+function openReviewModal(productId, context, targetName) {
     productBeingSold = productId;
-    currentRating = 0;
+    reviewContext    = context    || 'to_seller';
+    reviewTargetName = targetName || (context === 'to_buyer' ? 'el comprador' : 'el vendedor');
+    currentRating    = 0;
     setRating(0);
     document.getElementById('review-comment').value = '';
+    var titleEl    = document.getElementById('review-modal-title');
+    var subtitleEl = document.getElementById('review-modal-subtitle');
+    var commentEl  = document.getElementById('review-comment');
+    if (reviewContext === 'to_buyer') {
+        if (titleEl)    titleEl.textContent    = '¡Trato cerrado!';
+        if (subtitleEl) subtitleEl.textContent = '¿Cómo fue tu experiencia con ' + reviewTargetName + '?';
+        if (commentEl)  commentEl.placeholder  = '¿Algo que destacar del comprador?';
+    } else {
+        if (titleEl)    titleEl.textContent    = 'Valorar al vendedor';
+        if (subtitleEl) subtitleEl.textContent = '¿Cómo fue tu experiencia con ' + reviewTargetName + '?';
+        if (commentEl)  commentEl.placeholder  = '¿Algo que destacar del vendedor?';
+    }
     document.getElementById('review-modal').classList.remove('hidden');
+}
+
+// Wrappers sin argumentos de string para usar en onclick inline
+function openSellerReviewModal() {
+    var name = (currentChatUser && currentChatUser.name) || 'el comprador';
+    openReviewModal(currentChatProductId, 'to_buyer', name);
+}
+function openBuyerReviewModal() {
+    var name = (currentChatUser && currentChatUser.name) || 'el vendedor';
+    openReviewModal(currentChatProductId, 'to_seller', name);
 }
 
 function closeReviewModal() {
     document.getElementById('review-modal').classList.add('hidden');
+    productBeingSold = null;
 }
 
 function setRating(n) {
     currentRating = n;
-    const stars = document.querySelectorAll('.star-btn');
-    const labels = ["Malo", "Regular", "Bueno", "Muy Bueno", "Excelente"];
-    
-    stars.forEach((star, i) => {
-        if (i < n) {
-            star.innerText = '★';
-            star.style.color = '#1E40AF'; // Azul Báltico
-        } else {
-            star.innerText = '☆';
-            star.style.color = '#D1D5DB'; // Gris
-        }
+    var stars  = document.querySelectorAll('.star-btn');
+    var labels = ['Malo', 'Regular', 'Bueno', 'Muy bueno', 'Excelente'];
+    var label  = document.getElementById('rating-label');
+    stars.forEach(function(star, i) {
+        star.innerText    = i < n ? '★' : '☆';
+        star.style.color  = i < n ? 'var(--baltic)' : '#D1D5DB';
     });
-    
-    const label = document.getElementById('rating-label');
-    label.innerText = n > 0 ? labels[n-1] : "Toca una estrella";
-    if(n > 0) label.style.color = '#1E40AF';
+    label.innerText   = n > 0 ? labels[n - 1] : 'Toca una estrella';
+    label.style.color = n > 0 ? 'var(--baltic)' : '#6B7280';
 }
 
 async function submitReview() {
-    if (currentRating === 0) return alert("Por favor, selecciona una puntuación");
-    
-    const comment = document.getElementById('review-comment').value;
+    if (currentRating === 0) { alert('Por favor, selecciona una puntuación'); return; }
+    var comment    = document.getElementById('review-comment').value.trim();
+    var revieweeId = (reviewContext === 'to_buyer') ? currentChatId : currentChatProductSellerId;
 
-    // Aquí va tu lógica de Supabase (asumiendo que tienes la tabla 'reviews')
-    const { error } = await supabase.from('reviews').insert([
-        { product_id: productBeingSold, rating: currentRating, comment: comment }
-    ]);
-
-    // Cambiar estado a vendido
-    await supabase.from('products').update({ status: 'sold' }).eq('id', productBeingSold);
-
-    if (!error) {
-        alert("¡Vendido! Gracias por tu valoración.");
-        location.reload();
+    var reviewRes = await sb.from('reviews').insert([{
+        product_id:  productBeingSold,
+        seller_id:   currentChatProductSellerId,  // backward compat
+        reviewer_id: currentUser.id,
+        reviewee_id: revieweeId,
+        type:        reviewContext,
+        rating:      currentRating,
+        comment:     comment
+    }]);
+    if (reviewRes.error) {
+        console.error('[submitReview] reviews insert FAILED', reviewRes.error);
+        alert('Error al guardar la valoración');
+        return;
     }
+
+    // Solo el vendedor cambia el estado del producto a 'sold'
+    if (reviewContext === 'to_buyer') {
+        var soldRes = await sb.from('products')
+            .update({ status: 'sold' })
+            .eq('id', productBeingSold)
+            .eq('seller_id', currentUser.id);
+        if (soldRes.error) console.error('[submitReview] products update FAILED', soldRes.error);
+    }
+
+    currentChatUserReviewed = true;
+    closeReviewModal();
+
+    if (reviewContext === 'to_buyer') {
+        updateChatProductStatus('sold');
+    } else {
+        var amSeller = !!(currentChatProductSellerId && currentUser && currentChatProductSellerId === currentUser.id);
+        renderChatProductButtons(amSeller, currentChatProductStatus);
+    }
+    fetchProducts();
 }
-</body>
+
+/* ══════════════════
+   VALORACIONES PENDIENTES
+══════════════════ */
+async function checkPendingReviews() {
+    if (!currentUser || !isLoggedIn) return;
+
+    var dismissed = JSON.parse(sessionStorage.getItem('reviewsDismissed') || '[]');
+
+    // Reviews ya escritas por este usuario
+    var writtenRes = await sb.from('reviews').select('product_id').eq('reviewer_id', currentUser.id);
+    var reviewedSet = new Set((writtenRes.data || []).map(function(r) { return r.product_id; }));
+
+    // ── Como VENDEDOR: productos que vendió y aún no valoró al comprador ──
+    var sellerRes = await sb.from('products')
+        .select('id, title, image_url')
+        .eq('seller_id', currentUser.id)
+        .eq('status', 'sold')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+    var pendingSeller = (sellerRes.data || []).filter(function(p) {
+        return !reviewedSet.has(p.id) && dismissed.indexOf(p.id) === -1;
+    });
+
+    if (pendingSeller.length > 0) {
+        var prod = pendingSeller[0];
+        var msgRes = await sb.from('messages')
+            .select('sender_id, receiver_id')
+            .eq('product_id', prod.id)
+            .or('sender_id.eq.' + currentUser.id + ',receiver_id.eq.' + currentUser.id)
+            .limit(1).maybeSingle();
+        var buyerId = null;
+        if (msgRes.data) {
+            buyerId = msgRes.data.sender_id === currentUser.id ? msgRes.data.receiver_id : msgRes.data.sender_id;
+        }
+        var buyerName = 'el comprador', buyerAvatar = null;
+        if (buyerId) {
+            var bpRes = await sb.from('profiles').select('username, avatar_url').eq('id', buyerId).maybeSingle();
+            if (bpRes.data) { buyerName = bpRes.data.username || buyerName; buyerAvatar = bpRes.data.avatar_url; }
+        }
+        showPendingReviewModal(prod, { id: buyerId, name: buyerName, avatar: buyerAvatar }, 'to_buyer');
+        return;
+    }
+
+    // ── Como COMPRADOR: productos comprados en los que no valoró al vendedor ──
+    var msgsRes = await sb.from('messages')
+        .select('product_id')
+        .or('sender_id.eq.' + currentUser.id + ',receiver_id.eq.' + currentUser.id)
+        .not('product_id', 'is', null);
+
+    var productIds = Array.from(new Set((msgsRes.data || []).map(function(m) { return m.product_id; }).filter(Boolean)));
+    if (productIds.length === 0) return;
+
+    var buyerProdRes = await sb.from('products')
+        .select('id, title, image_url, seller_id')
+        .in('id', productIds)
+        .eq('status', 'sold')
+        .neq('seller_id', currentUser.id);
+
+    var pendingBuyer = (buyerProdRes.data || []).filter(function(p) {
+        return !reviewedSet.has(p.id) && dismissed.indexOf(p.id) === -1;
+    });
+    if (pendingBuyer.length === 0) return;
+
+    var bProd = pendingBuyer[0];
+    var spRes = await sb.from('profiles').select('username, avatar_url').eq('id', bProd.seller_id).maybeSingle();
+    var sellerName = 'el vendedor', sellerAvatar = null;
+    if (spRes.data) { sellerName = spRes.data.username || sellerName; sellerAvatar = spRes.data.avatar_url; }
+    showPendingReviewModal(bProd, { id: bProd.seller_id, name: sellerName, avatar: sellerAvatar }, 'to_seller');
+}
+
+function showPendingReviewModal(product, otherPerson, context) {
+    pendingRating        = 0;
+    pendingReviewProduct = product;
+    pendingReviewCtx     = context;
+    pendingReviewTarget  = otherPerson;
+
+    var titleEl   = document.getElementById('pend-product-title');
+    var imgEl     = document.getElementById('pend-product-img');
+    var nameEl    = document.getElementById('pend-other-name');
+    var subtitleEl= document.getElementById('pend-subtitle');
+    if (titleEl)    titleEl.textContent  = product.title || '';
+    if (imgEl)      { imgEl.src = product.image_url || ''; imgEl.style.display = product.image_url ? 'block' : 'none'; }
+    if (nameEl)     nameEl.textContent   = otherPerson.name || '';
+    if (subtitleEl) subtitleEl.textContent = context === 'to_buyer'
+        ? '¿Cómo fue la experiencia con ' + otherPerson.name + ' como comprador?'
+        : '¿Cómo fue la experiencia con ' + otherPerson.name + ' como vendedor?';
+
+    setPendingRating(0);
+    var commentEl = document.getElementById('pend-comment');
+    if (commentEl) commentEl.value = '';
+    document.getElementById('pending-review-modal').classList.remove('hidden');
+}
+
+function closePendingReviewModal() {
+    document.getElementById('pending-review-modal').classList.add('hidden');
+}
+
+function dismissPendingReview() {
+    if (pendingReviewProduct) {
+        var dismissed = JSON.parse(sessionStorage.getItem('reviewsDismissed') || '[]');
+        if (dismissed.indexOf(pendingReviewProduct.id) === -1) dismissed.push(pendingReviewProduct.id);
+        sessionStorage.setItem('reviewsDismissed', JSON.stringify(dismissed));
+    }
+    closePendingReviewModal();
+}
+
+function setPendingRating(n) {
+    pendingRating = n;
+    var stars  = document.querySelectorAll('.pend-star-btn');
+    var labels = ['Malo', 'Regular', 'Bueno', 'Muy bueno', 'Excelente'];
+    var label  = document.getElementById('pend-rating-label');
+    stars.forEach(function(star, i) {
+        star.innerText   = i < n ? '★' : '☆';
+        star.style.color = i < n ? 'var(--baltic)' : '#D1D5DB';
+    });
+    if (label) { label.innerText = n > 0 ? labels[n - 1] : 'Toca una estrella'; label.style.color = n > 0 ? 'var(--baltic)' : '#6B7280'; }
+}
+
+async function submitPendingReview() {
+    if (pendingRating === 0) { alert('Por favor, selecciona una puntuación'); return; }
+    if (!pendingReviewProduct || !pendingReviewTarget) return;
+
+    var comment    = (document.getElementById('pend-comment').value || '').trim();
+    var sellerId   = pendingReviewCtx === 'to_buyer' ? currentUser.id : (pendingReviewTarget.id || null);
+
+    var res = await sb.from('reviews').insert([{
+        product_id:  pendingReviewProduct.id,
+        seller_id:   sellerId,
+        reviewer_id: currentUser.id,
+        reviewee_id: pendingReviewTarget.id,
+        type:        pendingReviewCtx,
+        rating:      pendingRating,
+        comment:     comment
+    }]);
+
+    if (res.error) { console.error('[submitPendingReview] FAILED', res.error); alert('Error al guardar la valoración'); return; }
+
+    closePendingReviewModal();
+    // Tras valorar, comprobar si hay más pendientes
+    setTimeout(checkPendingReviews, 600);
+}
+
+</script>
+
+<!-- ── Modal valoración ── -->
 <div id="review-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
   <div class="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onclick="closeReviewModal()"></div>
-
   <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 z-10">
     <div class="flex items-center justify-between mb-5">
       <div>
-        <h2 class="text-lg font-semibold text-gray-900">Finalizar venta</h2>
-        <p class="text-sm text-gray-500 mt-0.5">Valora tu experiencia en Tirgus</p>
+        <h2 id="review-modal-title" class="text-lg font-semibold text-gray-900">Finalizar venta</h2>
+        <p id="review-modal-subtitle" class="text-sm text-gray-500 mt-0.5">Valora tu experiencia en Tirgus</p>
       </div>
       <button onclick="closeReviewModal()" class="text-gray-400 hover:text-gray-600">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
       </button>
     </div>
-
     <div class="mb-5 text-center">
       <div class="flex justify-center gap-2 mb-2">
         <button onclick="setRating(1)" class="star-btn text-4xl transition-transform hover:scale-110">☆</button>
@@ -3061,13 +3778,107 @@ async function submitReview() {
       </div>
       <p id="rating-label" class="text-xs font-medium text-gray-400 uppercase tracking-wider">Toca una estrella</p>
     </div>
-
-    <textarea id="review-comment" rows="3" placeholder="¿Algo que destacar del comprador?" 
-      class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition mb-6"></textarea>
-
-    <button onclick="submitReview()" class="w-full py-3 rounded-xl bg-[#1E40AF] text-white font-bold hover:bg-[#1e3a8a] transition">
+    <textarea id="review-comment" rows="3" placeholder="¿Algo que destacar del comprador?"
+      class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:border-blue-500 outline-none transition mb-6"></textarea>
+    <button onclick="submitReview()"
+      class="w-full py-3 rounded-xl text-white font-bold transition"
+      style="background:var(--baltic);">
       Confirmar y cerrar trato
     </button>
   </div>
 </div>
+
+<!-- ── Modal: Valoración pendiente ── -->
+<div id="pending-review-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-slate-900/70 backdrop-blur-sm"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 z-10 p-6">
+    <!-- Header -->
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="font-size:30px;line-height:1;margin-bottom:10px;">⭐</div>
+      <h2 style="font-size:17px;font-weight:700;color:#1a1a2e;margin:0 0 5px;">¡Tienes un trato pendiente de valorar!</h2>
+      <p id="pend-subtitle" style="font-size:13px;color:#64748b;margin:0;line-height:1.4;"></p>
+    </div>
+    <!-- Producto + persona -->
+    <div style="display:flex;align-items:center;gap:12px;background:#f8fafc;border-radius:12px;padding:12px 14px;margin-bottom:18px;border:1.5px solid #f1f5f9;">
+      <img id="pend-product-img" src="" alt="" style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#e6f3f8;">
+      <div style="min-width:0;">
+        <p id="pend-product-title" style="font-size:14px;font-weight:600;color:#1a1a2e;margin:0 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></p>
+        <p style="font-size:12px;color:#94a3b8;margin:0;">con <span id="pend-other-name" style="font-weight:600;color:#475569;"></span></p>
+      </div>
+    </div>
+    <!-- Estrellas -->
+    <div style="text-align:center;margin-bottom:14px;">
+      <div style="display:flex;justify-content:center;gap:6px;margin-bottom:6px;">
+        <button onclick="setPendingRating(1)" class="pend-star-btn" style="font-size:38px;background:none;border:none;cursor:pointer;color:#D1D5DB;line-height:1;padding:0;">☆</button>
+        <button onclick="setPendingRating(2)" class="pend-star-btn" style="font-size:38px;background:none;border:none;cursor:pointer;color:#D1D5DB;line-height:1;padding:0;">☆</button>
+        <button onclick="setPendingRating(3)" class="pend-star-btn" style="font-size:38px;background:none;border:none;cursor:pointer;color:#D1D5DB;line-height:1;padding:0;">☆</button>
+        <button onclick="setPendingRating(4)" class="pend-star-btn" style="font-size:38px;background:none;border:none;cursor:pointer;color:#D1D5DB;line-height:1;padding:0;">☆</button>
+        <button onclick="setPendingRating(5)" class="pend-star-btn" style="font-size:38px;background:none;border:none;cursor:pointer;color:#D1D5DB;line-height:1;padding:0;">☆</button>
+      </div>
+      <p id="pend-rating-label" style="font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.06em;margin:0;">Toca una estrella</p>
+    </div>
+    <!-- Comentario -->
+    <textarea id="pend-comment" rows="2" placeholder="Comentario opcional…"
+      style="width:100%;border:1.5px solid #e2e8f0;border-radius:12px;padding:10px 14px;font-size:13px;font-family:inherit;resize:none;outline:none;margin-bottom:14px;box-sizing:border-box;"
+      onfocus="this.style.borderColor='var(--baltic)'" onblur="this.style.borderColor='#e2e8f0'"></textarea>
+    <!-- Botones -->
+    <button onclick="submitPendingReview()" class="btn-primary" style="font-size:15px;margin-bottom:8px;">
+      Confirmar valoración
+    </button>
+    <button onclick="dismissPendingReview()"
+      style="width:100%;padding:10px;background:none;border:none;font-size:13px;color:#94a3b8;cursor:pointer;font-family:inherit;">
+      Luego
+    </button>
+  </div>
+</div>
+
+<!-- ── Modal: Editar perfil ── -->
+<div id="edit-profile-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onclick="closeEditProfile()"></div>
+  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 z-10" style="max-height:90vh;overflow-y:auto;">
+    <div style="padding:22px 22px 0;display:flex;align-items:center;justify-content:space-between;">
+      <h2 style="font-size:18px;font-weight:700;color:#1a1a2e;margin:0;">Editar perfil</h2>
+      <button onclick="closeEditProfile()" style="color:#94a3b8;background:none;border:none;cursor:pointer;padding:4px;line-height:1;">
+        <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div style="padding:20px 22px 24px;">
+      <!-- Avatar -->
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;padding:14px;background:#f8fafc;border-radius:12px;">
+        <div id="ep-avatar-ring" style="width:58px;height:58px;border-radius:50%;overflow:hidden;background:var(--baltic);display:flex;align-items:center;justify-content:center;flex-shrink:0;border:2px solid #e2e8f0;">
+          <span id="ep-avatar-initial" style="font-size:22px;font-weight:700;color:#fff;">J</span>
+          <img id="ep-avatar-img" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;">
+        </div>
+        <div>
+          <p style="font-size:13px;font-weight:600;color:#1a1a2e;margin:0 0 6px;">Foto de perfil</p>
+          <button onclick="document.getElementById('avatarInput').click()"
+            style="font-size:12px;font-weight:600;color:var(--baltic);background:#e6f3f8;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-family:inherit;">
+            Cambiar foto
+          </button>
+          <input type="file" id="avatarInput" accept="image/*" style="display:none" onchange="previewEditAvatar(event)">
+        </div>
+      </div>
+      <!-- Nombre -->
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px;">Nombre de usuario</label>
+        <input type="text" id="ep-username" class="form-input" placeholder="Tu nombre público">
+      </div>
+      <!-- Ubicación -->
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px;">Ubicación</label>
+        <input type="text" id="ep-location" class="form-input" placeholder="Ej: Miraflores, Lima">
+      </div>
+      <!-- Biografía -->
+      <div style="margin-bottom:22px;">
+        <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px;">Biografía</label>
+        <textarea id="ep-bio" class="form-input" rows="3" placeholder="Cuéntale a los demás quién eres…" style="resize:none;"></textarea>
+      </div>
+      <button id="ep-save-btn" onclick="saveProfile()" class="btn-primary" style="font-size:15px;">
+        Guardar cambios
+      </button>
+    </div>
+  </div>
+</div>
+
+</body>
 </html>
