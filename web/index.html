@@ -339,9 +339,39 @@
         }
         /* Filter section labels */
         .filter-label { font-size: 11px; font-weight: 700; color: #b0b5bf; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 12px; }
+
+        /* ── Toast notifications ── */
+        @keyframes toast-in  { from { opacity:0; transform:translateY(-14px) scale(.96); } to { opacity:1; transform:translateY(0) scale(1); } }
+        @keyframes toast-out { from { opacity:1; transform:translateY(0) scale(1); } to { opacity:0; transform:translateY(-10px) scale(.96); } }
+        .tirgus-toast {
+            background: #0f172a; color: #fff; border-radius: 16px;
+            padding: 12px 14px; box-shadow: 0 8px 32px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.2);
+            display: flex; align-items: flex-start; gap: 12px; cursor: pointer;
+            animation: toast-in .28s cubic-bezier(0,.6,.4,1) both;
+            pointer-events: all; user-select: none;
+        }
+        .tirgus-toast .t-avatar {
+            width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+            background: var(--baltic); display: flex; align-items: center; justify-content: center;
+            font-size: 15px; font-weight: 700; color: #fff;
+        }
+        .tirgus-toast .t-body { flex: 1; min-width: 0; }
+        .tirgus-toast .t-name { font-size: 13px; font-weight: 700; margin: 0 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tirgus-toast .t-text { font-size: 12px; opacity: .75; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tirgus-toast .t-close { flex-shrink: 0; background: rgba(255,255,255,.12); border: none; color: #fff; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; line-height: 1; margin-top: 2px; }
+
+        /* ── Msg unread badge ── */
+        .nav-badge { position: absolute; top: 6px; right: calc(50% - 18px); width: 8px; height: 8px; border-radius: 50%; background: #ef4444; border: 2px solid #fff; display: none; }
     </style>
 </head>
 <body>
+
+<!-- ── Toast container ── -->
+<div id="toast-container"
+     style="position:fixed;top:16px;left:50%;transform:translateX(-50%);
+            z-index:2000;width:calc(100% - 32px);max-width:400px;
+            pointer-events:none;display:flex;flex-direction:column;gap:8px;"></div>
+
 
 <!-- ═══════════════════════════════
      HOME — Explorar
@@ -877,9 +907,10 @@
         <span id="saved-badge" style="display:none;position:absolute;top:6px;right:calc(50% - 16px);min-width:16px;height:16px;background:var(--baltic);color:#fff;border-radius:99px;font-size:9px;font-weight:700;line-height:16px;text-align:center;padding:0 3px;"></span>
     </button>
     <!-- Mensajes -->
-    <button id="tab-messages" onclick="showTab('messages')">
+    <button id="tab-messages" onclick="showTab('messages')" style="position:relative;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
         Mensajes
+        <span id="msg-badge" class="nav-badge"></span>
     </button>
     <!-- Perfil -->
     <button id="tab-profile" onclick="showTab('profile')">
@@ -1017,12 +1048,133 @@ let pendingReviewProduct        = null;
 let pendingReviewCtx            = null;
 let pendingReviewTarget         = null;
 let chatMessages         = [];     // mensajes del chat activo
-let chatSubscription     = null;   // canal realtime activo
+let chatSubscription     = null;   // canal realtime del chat activo
+let globalMsgSub         = null;   // canal global de notificaciones
 let selectedCondition = '';
 let publishPhotos     = [];
 let editingProductId  = null;   // DB id while editing; null when publishing new
 let authMode          = 'register';  // 'register' | 'login'
 let allProducts       = [];          // copia maestra para filtrado
+
+/* ══════════════════════════════════════
+   SISTEMA DE NOTIFICACIONES EN TIEMPO REAL
+══════════════════════════════════════ */
+
+function _msgToToastText(content) {
+    if (!content) return '';
+    var fmt = function(p) { return 'S/ ' + Number(p).toLocaleString('es-PE'); };
+    if (content.indexOf('__OFFER__:') === 0)
+        return 'Te hizo una oferta por ' + fmt(content.split(':')[1]);
+    if (content.indexOf('__COUNTER_OFFER__:') === 0)
+        return 'Contraoferta por ' + fmt(content.split(':')[2]);
+    if (content.indexOf('__OFFER_ACCEPTED__:') === 0 || content.indexOf('__COUNTER_ACCEPTED__:') === 0)
+        return '¡Aceptó la oferta a ' + fmt(content.split(':')[2]) + '! ✓';
+    if (content.indexOf('__OFFER_REJECTED__:') === 0 || content.indexOf('__COUNTER_REJECTED__:') === 0)
+        return 'Rechazó tu oferta';
+    return content.length > 58 ? content.slice(0, 58) + '…' : content;
+}
+
+function showToast(senderName, text, onClickFn) {
+    var container = document.getElementById('toast-container');
+    if (!container) return;
+    var initial = (senderName || '?').charAt(0).toUpperCase();
+    var toast = document.createElement('div');
+    toast.className = 'tirgus-toast';
+    toast.innerHTML =
+        '<div class="t-avatar">' + initial + '</div>' +
+        '<div class="t-body">' +
+            '<p class="t-name">' + escapeHtml(senderName || 'Mensaje nuevo') + '</p>' +
+            '<p class="t-text">' + escapeHtml(text) + '</p>' +
+        '</div>' +
+        '<button class="t-close" onclick="event.stopPropagation();_removeToast(this.parentNode)">✕</button>';
+    toast.onclick = function() {
+        _removeToast(toast);
+        if (onClickFn) onClickFn();
+    };
+    container.appendChild(toast);
+    var timer = setTimeout(function() { _removeToast(toast); }, 4800);
+    toast._timer = timer;
+}
+
+function _removeToast(toast) {
+    if (!toast || !toast.parentNode) return;
+    clearTimeout(toast._timer);
+    toast.style.animation = 'toast-out .22s ease forwards';
+    setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 220);
+}
+
+function setMsgBadge(visible) {
+    var el = document.getElementById('msg-badge');
+    if (el) el.style.display = visible ? 'block' : 'none';
+}
+
+function refreshUnreadBadge() {
+    if (!currentUser) { setMsgBadge(false); return; }
+    sb.from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('receiver_id', currentUser.id)
+        .eq('read', false)
+        .then(function(r) { setMsgBadge(!!(r.count && r.count > 0)); });
+}
+
+function startGlobalMsgListener() {
+    if (!currentUser) return;
+    if (globalMsgSub) { try { sb.removeChannel(globalMsgSub); } catch(e){} globalMsgSub = null; }
+    globalMsgSub = sb.channel('notif:' + currentUser.id)
+        .on('postgres_changes', {
+            event: 'INSERT', schema: 'public', table: 'messages',
+            filter: 'receiver_id=eq.' + currentUser.id
+        }, function(payload) {
+            var msg = payload.new;
+            // Don't notify if the user is already reading this exact chat
+            var chatOpen = document.getElementById('chat-view') &&
+                           document.getElementById('chat-view').classList.contains('active');
+            var sameChat = chatOpen && currentChatId === msg.sender_id &&
+                           (!msg.product_id || msg.product_id === currentChatProductId);
+            if (!sameChat) {
+                setMsgBadge(true);
+                var text = _msgToToastText(msg.content || '');
+                if (!text) return;
+                var senderId  = msg.sender_id;
+                var productId = msg.product_id || null;
+                sb.from('profiles').select('username, avatar_url').eq('id', senderId).maybeSingle()
+                    .then(function(r) {
+                        var name   = (r.data && r.data.username)   || 'Alguien';
+                        var avatar = (r.data && r.data.avatar_url) || '';
+                        showToast(name, text, function() {
+                            // Navigate straight to the relevant chat
+                            if (productId) {
+                                sb.from('products')
+                                    .select('title, image_url, price, seller_id, status')
+                                    .eq('id', productId).maybeSingle()
+                                    .then(function(pr) {
+                                        showTab('messages');
+                                        if (pr.data) {
+                                            var p = pr.data;
+                                            var priceLabel = p.price != null
+                                                ? 'S/ ' + Number(p.price).toLocaleString('es-PE') : '';
+                                            openChat(senderId, name, avatar, productId,
+                                                     p.title, p.image_url, priceLabel,
+                                                     p.seller_id, p.status || 'available');
+                                        } else {
+                                            openChat(senderId, name, avatar, null, null, null, null, null, 'available');
+                                        }
+                                    });
+                            } else {
+                                showTab('messages');
+                                openChat(senderId, name, avatar, null, null, null, null, null, 'available');
+                            }
+                        });
+                    });
+            }
+        })
+        .subscribe();
+}
+
+function stopGlobalMsgListener() {
+    if (globalMsgSub) { try { sb.removeChannel(globalMsgSub); } catch(e){} globalMsgSub = null; }
+    setMsgBadge(false);
+}
 
 /* ── Listener reactivo de sesión ── */
 sb.auth.onAuthStateChange(function(event, session) {
@@ -1047,11 +1199,15 @@ sb.auth.onAuthStateChange(function(event, session) {
             pendingAction = null;
             showTab('home');
             setTimeout(checkPendingReviews, 1800);
+            startGlobalMsgListener();
+            refreshUnreadBadge();
         }
         // INITIAL_SESSION: página recargada, cargamos el perfil del usuario actual
         if (event === 'INITIAL_SESSION') {
             loadProfile();
             ensureProfileName(session.user); // por si el upsert falló en el registro anterior
+            startGlobalMsgListener();
+            refreshUnreadBadge();
         }
     } else {
         isLoggedIn  = false;
@@ -1059,6 +1215,7 @@ sb.auth.onAuthStateChange(function(event, session) {
         clearUserUI();         // wipe avatar and all profile fields immediately
         favorites.clear();
         updateSavedBadge();
+        stopGlobalMsgListener();
     }
 });
 
@@ -1418,7 +1575,7 @@ function showTab(tab) {
     currentTab = tab;
     document.getElementById(tab + '-view').classList.add('active');
     document.getElementById('tab-' + tab).classList.add('active-tab');
-    if (tab === 'messages') loadConversations();
+    if (tab === 'messages') { loadConversations(); refreshUnreadBadge(); }
     if (tab === 'profile')  loadProfile();
     if (tab === 'saved')    loadFavorites();
 }
@@ -1551,6 +1708,7 @@ function showSellerTab(tab) {
 function openProduct(id) {
     var p = PRODUCTS[id];
     if (!p) return;
+    history.pushState({ productId: id }, '', '?product=' + id);
     var stars    = '★'.repeat(Math.round(p.rating)) + '☆'.repeat(5 - Math.round(p.rating));
     var init     = p.seller.charAt(0).toUpperCase();
     var sellerAv = p.seller_avatar_url
@@ -1603,6 +1761,41 @@ function closeProduct() {
     document.getElementById('product-view').classList.remove('active');
     document.getElementById('productActionBar').classList.remove('open');
     document.getElementById('bottom-nav').style.display = 'flex';
+    if (new URLSearchParams(location.search).get('product')) {
+        history.pushState({}, '', location.pathname);
+    }
+}
+
+// Opens a product by its Supabase UUID — fetches from DB if not yet cached
+function openProductById(dbId) {
+    // Check if already cached
+    var cacheKey = 'db_' + dbId;
+    if (PRODUCTS[cacheKey]) { openProduct(cacheKey); return; }
+    sb.from('products').select('*, profiles(username, avatar_url, location)').eq('id', dbId).maybeSingle()
+        .then(function(r) {
+            if (!r.data) return;
+            var p = r.data;
+            var prof = p.profiles || {};
+            var priceLabel = p.price != null ? 'S/ ' + (typeof p.price === 'number' ? p.price.toLocaleString('es-PE') : p.price) : '';
+            PRODUCTS[cacheKey] = {
+                title:             p.title || '',
+                price:             priceLabel,
+                raw_price:         typeof p.price === 'number' ? p.price : parseFloat((p.price || '0').replace(/[^0-9.]/g, '')) || 0,
+                image:             p.image_url || '',
+                desc:              p.description || '',
+                location:          p.location || prof.location || '',
+                seller:            prof.username || 'Vendedor',
+                seller_id:         p.seller_id || null,
+                seller_avatar_url: prof.avatar_url || null,
+                rating:            p.rating || 5.0,
+                reviews:           p.reviews || 0,
+                category:          p.category || '',
+                condition:         p.condition || '',
+                status:            p.status || 'available',
+                db_id:             p.id || null
+            };
+            openProduct(cacheKey);
+        });
 }
 
 function deleteProduct(id) {
@@ -1949,6 +2142,66 @@ function rejectOffer(offerId, price) {
     });
 }
 
+var _coPrevMsgId = null;
+
+function openCounterDrawer(prevMsgId, currentPrice) {
+    _coPrevMsgId = prevMsgId;
+    var ctx = document.getElementById('co-context');
+    if (ctx) ctx.textContent = currentPrice
+        ? 'Precio propuesto: S/ ' + Number(currentPrice).toLocaleString('es-PE')
+        : '';
+    var inp = document.getElementById('co-input');
+    if (inp) { inp.value = ''; inp.style.borderColor = '#e2e8f0'; }
+    document.getElementById('co-overlay').style.display = 'block';
+    document.getElementById('co-drawer').style.transform = 'translateY(0)';
+    setTimeout(function() { if (inp) inp.focus(); }, 340);
+}
+
+function closeCounterDrawer() {
+    document.getElementById('co-drawer').style.transform = 'translateY(100%)';
+    document.getElementById('co-overlay').style.display = 'none';
+    var inp = document.getElementById('co-input');
+    if (inp) inp.value = '';
+}
+
+function submitCounterDrawer() {
+    if (_coPrevMsgId && doCounter('co-input', _coPrevMsgId)) {
+        closeCounterDrawer();
+    }
+}
+
+// Sends a counter offer message; returns true on success, false on validation failure
+function doCounter(inputId, prevMsgId) {
+    var inp = document.getElementById(inputId);
+    if (!inp) return false;
+    var price = Number(inp.value.trim());
+    if (!price || price <= 0) { inp.style.borderColor = '#dc2626'; inp.focus(); return false; }
+    inp.style.borderColor = '#e2e8f0';
+    var text = '__COUNTER_OFFER__:' + prevMsgId + ':' + price;
+    var optimistic = { id: '_pending_counter', sender_id: currentUser.id, content: text, created_at: new Date().toISOString(), read: false };
+    chatMessages.push(optimistic);
+    renderMessages(chatMessages);
+    var msgPayload = { sender_id: currentUser.id, receiver_id: currentChatId, content: text };
+    if (currentChatProductId) msgPayload.product_id = currentChatProductId;
+    sb.from('messages').insert(msgPayload).select().single().then(function(r) {
+        var idx = chatMessages.findIndex(function(m) { return m.id === '_pending_counter'; });
+        if (idx !== -1) chatMessages[idx] = r.error ? optimistic : r.data;
+        renderMessages(chatMessages);
+    });
+    return true;
+}
+
+function acceptCounter(counterMsgId, counterPrice) {
+    var text = '__COUNTER_ACCEPTED__:' + counterMsgId + ':' + counterPrice;
+    var msgPayload = { sender_id: currentUser.id, receiver_id: currentChatId, content: text };
+    if (currentChatProductId) msgPayload.product_id = currentChatProductId;
+    sb.from('messages').insert(msgPayload).select().single().then(function(r) {
+        if (r.error) { console.error('[acceptCounter] FAILED', r.error); return; }
+        chatMessages.push(r.data);
+        renderMessages(chatMessages);
+    });
+}
+
 function updateHeaderPrice(agreedPrice) {
     var priceEl = document.getElementById('chatProdPrice');
     if (!priceEl) return;
@@ -2090,6 +2343,7 @@ function markMessagesAsRead(otherId, productId) {
                 m.read = true;
             }
         });
+        if (n > 0) refreshUnreadBadge();
     });
 }
 
@@ -2101,18 +2355,22 @@ function renderMessages(messages) {
         return;
     }
 
-    // First pass: collect offer responses keyed by the original offer message ID
-    var offerResponses = {};   // offerId → 'accepted' | 'rejected'
-    var agreedPrice    = null;
+    // First pass: unified responses map — covers original offers AND counter-offers
+    // responses[msgId] → 'accepted' | 'rejected' | 'countered'
+    var responses   = {};
+    var agreedPrice = null;
     messages.forEach(function(msg) {
         var c = msg.content || '';
-        if (c.indexOf('__OFFER_ACCEPTED__:') === 0 || c.indexOf('__OFFER_REJECTED__:') === 0) {
-            var parts    = c.split(':');
-            var type     = parts[0];
-            var offerId  = parts[1];
-            var price    = parts[2];
-            offerResponses[offerId] = (type === '__OFFER_ACCEPTED__') ? 'accepted' : 'rejected';
-            if (type === '__OFFER_ACCEPTED__') agreedPrice = price;
+        if (c.indexOf('__OFFER_ACCEPTED__:') === 0) {
+            var parts = c.split(':'); responses[parts[1]] = 'accepted'; agreedPrice = parts[2];
+        } else if (c.indexOf('__OFFER_REJECTED__:') === 0) {
+            var parts = c.split(':'); responses[parts[1]] = 'rejected';
+        } else if (c.indexOf('__COUNTER_OFFER__:') === 0) {
+            var parts = c.split(':'); responses[parts[1]] = 'countered';
+        } else if (c.indexOf('__COUNTER_ACCEPTED__:') === 0) {
+            var parts = c.split(':'); responses[parts[1]] = 'accepted'; agreedPrice = parts[2];
+        } else if (c.indexOf('__COUNTER_REJECTED__:') === 0) {
+            var parts = c.split(':'); responses[parts[1]] = 'rejected';
         }
     });
     updateHeaderPrice(agreedPrice);
@@ -2125,52 +2383,113 @@ function renderMessages(messages) {
         var time = formatRelTime(msg.created_at);
         var wrap = document.createElement('div');
 
-        // Skip internal response messages — they are encoded in offerResponses, not shown as bubbles
-        if (c.indexOf('__OFFER_ACCEPTED__:') === 0 || c.indexOf('__OFFER_REJECTED__:') === 0) return;
+        // Internal response messages are encoded in `responses` — not rendered as visible elements
+        if (c.indexOf('__OFFER_ACCEPTED__:')   === 0 || c.indexOf('__OFFER_REJECTED__:')   === 0 ||
+            c.indexOf('__COUNTER_ACCEPTED__:') === 0 || c.indexOf('__COUNTER_REJECTED__:') === 0) return;
 
-        // ── Offer card ──
+        // ── Offer card (buyer's original offer) ──
         if (c.indexOf('__OFFER__:') === 0) {
-            var offerPrice = c.slice('__OFFER__:'.length);
-            var response   = offerResponses[msg.id] || null;
-            var isPending  = !response;
-            var isAccepted = response === 'accepted';
-            var isRejected = response === 'rejected';
+            var offerPrice  = c.slice('__OFFER__:'.length);
+            var resp        = responses[msg.id] || null;
+            var isAccepted  = resp === 'accepted';
+            var isRejected  = resp === 'rejected';
+            var isCountered = resp === 'countered';
+            var isPending   = !resp;
 
-            var cardBg   = isAccepted ? '#dcfce7' : isRejected ? '#fee2e2' : '#e6f3f8';
-            var priceClr = isAccepted ? '#15803d' : isRejected ? '#dc2626' : 'var(--baltic)';
-            var statusLabel = isAccepted ? 'Oferta Aceptada' : isRejected ? 'Oferta Rechazada' : '';
+            // Seller's turn to act on a pending original offer
+            var sellerActs = isPending && amSeller && msg.id && msg.id !== '_pending';
 
-            var buttonsHtml = '';
-            // Seller sees Accept/Reject only while pending and once the message has a real DB id
-            if (isPending && amSeller && msg.id && msg.id !== '_pending') {
-                buttonsHtml =
-                    '<div style="display:flex;gap:8px;margin-top:10px;">' +
-                        '<button onclick="rejectOffer(\'' + msg.id + '\',\'' + offerPrice + '\')" ' +
-                            'style="flex:1;padding:8px;border-radius:9px;border:1.5px solid #dc2626;color:#dc2626;' +
-                            'background:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">' +
-                            'Rechazar' +
-                        '</button>' +
+            var bg      = isAccepted ? '#f0fdf4' : isRejected ? '#fef2f2' : isCountered ? '#f8fafc' : '#f0f7fb';
+            var border  = isAccepted ? '#86efac' : isRejected ? '#fca5a5' : isCountered ? '#cbd5e1' : '#bae0f0';
+            var priceClr = isAccepted ? '#15803d' : isRejected ? '#dc2626' : isCountered ? '#94a3b8' : 'var(--baltic)';
+            var badge   = isAccepted ? '✓ Oferta aceptada' : isRejected ? '✗ Oferta rechazada' : isCountered ? 'Contrarrestada →' : '';
+
+            var actionHtml = '';
+            if (sellerActs) {
+                actionHtml =
+                    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;' +
+                        'padding-top:12px;border-top:1px solid ' + border + ';">' +
+                        '<button onclick="openCounterDrawer(\'' + msg.id + '\',\'' + offerPrice + '\')" ' +
+                            'style="padding:12px;border-radius:10px;border:2px solid var(--baltic);color:var(--baltic);' +
+                            'background:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">' +
+                            'Contraoferta</button>' +
                         '<button onclick="acceptOffer(\'' + msg.id + '\',\'' + offerPrice + '\')" ' +
-                            'style="flex:1;padding:8px;border-radius:9px;border:none;background:#15803d;color:#fff;' +
-                            'font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">' +
-                            'Aceptar Oferta' +
-                        '</button>' +
+                            'style="padding:12px;border-radius:10px;border:none;background:#15803d;color:#fff;' +
+                            'font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">' +
+                            'Aceptar</button>' +
                     '</div>';
             }
 
             wrap.className = 'flex justify-center';
+            wrap.style.padding = '2px 20px';
             var card = document.createElement('div');
-            card.style.cssText = 'background:' + cardBg + ';border-radius:16px;padding:14px 18px;' +
-                'max-width:260px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06);';
+            card.style.cssText = 'width:100%;border-radius:16px;padding:16px 18px;' +
+                'background:' + bg + ';border:1.5px solid ' + border + ';' +
+                'box-shadow:0 1px 6px rgba(0,0,0,.06);';
             card.innerHTML =
-                '<p style="font-size:11px;color:#64748b;font-weight:500;margin-bottom:4px;">' +
-                    (isMe ? 'Has enviado una oferta' : 'Oferta de compra') + '</p>' +
-                '<p style="font-size:22px;font-weight:800;color:' + priceClr + ';line-height:1.1;">S/ ' +
-                    Number(offerPrice).toLocaleString('es-PE') + '</p>' +
-                (statusLabel ? '<p style="font-size:12px;font-weight:700;color:' + priceClr + ';margin-top:5px;">' + statusLabel + '</p>' : '') +
-                buttonsHtml +
-                '<p style="font-size:10px;color:#b0b5bf;margin-top:8px;">' + time + '</p>';
+                '<p style="font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;' +
+                    'letter-spacing:.05em;margin-bottom:6px;">' +
+                    (isMe ? 'Tu oferta' : 'Oferta del comprador') + '</p>' +
+                '<p style="font-size:26px;font-weight:800;color:' + priceClr + ';line-height:1;margin-bottom:' + (badge ? '6px' : '0') + ';">' +
+                    'S/ ' + Number(offerPrice).toLocaleString('es-PE') + '</p>' +
+                (badge ? '<p style="font-size:12px;font-weight:700;color:' + priceClr + ';">' + badge + '</p>' : '') +
+                actionHtml +
+                '<p style="font-size:10px;color:#b0b5bf;margin-top:10px;">' + time + '</p>';
             wrap.appendChild(card);
+            container.appendChild(wrap);
+            return;
+        }
+
+        // ── Counter offer card (infinite back-and-forth) ──
+        if (c.indexOf('__COUNTER_OFFER__:') === 0) {
+            var cParts       = c.split(':');
+            var counterPrice = cParts[2];
+            var resp         = responses[msg.id] || null;
+            var isAccepted   = resp === 'accepted';
+            var isCountered  = resp === 'countered';  // another counter was sent in response
+            var isPending    = !resp && msg.id !== '_pending_counter';
+
+            // The OTHER party acts: if I sent this counter, the other person responds
+            var iSentThis = msg.sender_id === (currentUser && currentUser.id);
+            var myTurn    = isPending && !iSentThis;
+
+            var cBg     = isAccepted ? '#f0fdf4' : isCountered ? '#f8fafc' : '#fffbeb';
+            var cBorder = isAccepted ? '#86efac' : isCountered ? '#cbd5e1' : '#fde68a';
+            var cClr    = isAccepted ? '#15803d' : isCountered ? '#94a3b8' : '#92400e';
+            var cBadge  = isAccepted ? '✓ Contraoferta aceptada' : isCountered ? 'Contrarrestada →' : '';
+
+            var cActionHtml = '';
+            if (myTurn) {
+                cActionHtml =
+                    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;' +
+                        'padding-top:12px;border-top:1px solid ' + cBorder + ';">' +
+                        '<button onclick="openCounterDrawer(\'' + msg.id + '\',\'' + counterPrice + '\')" ' +
+                            'style="padding:12px;border-radius:10px;border:2px solid var(--baltic);color:var(--baltic);' +
+                            'background:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">' +
+                            'Contraoferta</button>' +
+                        '<button onclick="acceptCounter(\'' + msg.id + '\',\'' + counterPrice + '\')" ' +
+                            'style="padding:12px;border-radius:10px;border:none;background:#15803d;color:#fff;' +
+                            'font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">' +
+                            'Aceptar</button>' +
+                    '</div>';
+            }
+
+            wrap.className = 'flex justify-center';
+            wrap.style.padding = '2px 20px';
+            var cCard = document.createElement('div');
+            cCard.style.cssText = 'width:100%;border-radius:16px;padding:16px 18px;' +
+                'background:' + cBg + ';border:1.5px solid ' + cBorder + ';' +
+                'box-shadow:0 1px 6px rgba(0,0,0,.06);';
+            cCard.innerHTML =
+                '<p style="font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;' +
+                    'letter-spacing:.05em;margin-bottom:6px;">' +
+                    (iSentThis ? 'Tu contraoferta' : 'Contraoferta recibida') + '</p>' +
+                '<p style="font-size:26px;font-weight:800;color:' + cClr + ';line-height:1;margin-bottom:' + (cBadge ? '6px' : '0') + ';">' +
+                    'S/ ' + Number(counterPrice).toLocaleString('es-PE') + '</p>' +
+                (cBadge ? '<p style="font-size:12px;font-weight:700;color:' + cClr + ';">' + cBadge + '</p>' : '') +
+                cActionHtml +
+                '<p style="font-size:10px;color:#b0b5bf;margin-top:10px;">' + time + '</p>';
+            wrap.appendChild(cCard);
             container.appendChild(wrap);
             return;
         }
@@ -2344,9 +2663,12 @@ function renderConversationList(convos, profileMap, productMap) {
         var previewColor = hasUnread ? '#1a1a2e' : '#94a3b8';
         var previewWeight= hasUnread ? '500'     : '400';
         var rawPreview = c.preview || '';
-        var friendlyPreview = rawPreview.indexOf('__OFFER_ACCEPTED__:') !== -1 ? '¡Oferta aceptada!'
-                            : rawPreview.indexOf('__OFFER_REJECTED__:') !== -1 ? 'Oferta rechazada'
-                            : rawPreview.indexOf('__OFFER__:')          !== -1 ? 'Propuesta de oferta'
+        var friendlyPreview = rawPreview.indexOf('__OFFER_ACCEPTED__:')   !== -1 ? '¡Oferta aceptada!'
+                            : rawPreview.indexOf('__OFFER_REJECTED__:')   !== -1 ? 'Oferta rechazada'
+                            : rawPreview.indexOf('__COUNTER_ACCEPTED__:') !== -1 ? '¡Contraoferta aceptada!'
+                            : rawPreview.indexOf('__COUNTER_REJECTED__:') !== -1 ? 'Contraoferta rechazada'
+                            : rawPreview.indexOf('__COUNTER_OFFER__:')    !== -1 ? 'Contraoferta del vendedor'
+                            : rawPreview.indexOf('__OFFER__:')            !== -1 ? 'Propuesta de oferta'
                             : rawPreview;
         var previewText  = (c.lastSenderIsMe ? 'Tú: ' : '') + friendlyPreview;
 
@@ -3501,7 +3823,41 @@ document.addEventListener('keydown', function(e) {
 updatePriceSlider(null);   // inicializar barra de precio
 fetchProducts();
 
-// Comprobar sesión existente al cargar
+// Si la URL ya trae ?product=id al cargar la página, abrir ese producto
+(function() {
+    var initialProduct = new URLSearchParams(location.search).get('product');
+    if (initialProduct) {
+        // Reemplazar la entrada actual para que el back-button vuelva a home limpio
+        history.replaceState({}, '', location.pathname);
+        // Esperar a que fetchProducts haya cargado el catálogo (máx ~2 s)
+        var attempts = 0;
+        var interval = setInterval(function() {
+            attempts++;
+            var cacheKey = 'db_' + initialProduct;
+            if (PRODUCTS[cacheKey]) {
+                clearInterval(interval);
+                openProduct(cacheKey);
+            } else if (attempts > 10) {
+                clearInterval(interval);
+                openProductById(initialProduct);
+            }
+        }, 200);
+    }
+})();
+
+// Botón atrás del navegador: cerrar producto si el query param desaparece
+window.addEventListener('popstate', function() {
+    if (!new URLSearchParams(location.search).get('product')) {
+        var view = document.getElementById('product-view');
+        if (view && view.classList.contains('active')) {
+            document.getElementById('product-view').classList.remove('active');
+            document.getElementById('productActionBar').classList.remove('open');
+            document.getElementById('bottom-nav').style.display = 'flex';
+        }
+    }
+});
+
+// Comprobar sesión existente al cargar (fallback — INITIAL_SESSION en onAuthStateChange es el camino principal)
 sb.auth.getSession().then(function(result) {
     if (result.data && result.data.session) {
         isLoggedIn  = true;
@@ -3510,6 +3866,7 @@ sb.auth.getSession().then(function(result) {
         fetchUserFavorites();
         if (currentTab === 'profile') loadProfile();
         setTimeout(checkPendingReviews, 1800);
+        if (!globalMsgSub) { startGlobalMsgListener(); refreshUnreadBadge(); }
     }
 });
 
@@ -3878,6 +4235,40 @@ async function submitPendingReview() {
       </button>
     </div>
   </div>
+</div>
+
+<!-- ── Counter Offer Drawer ── -->
+<div id="co-overlay" onclick="closeCounterDrawer()"
+     style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);
+            z-index:1100;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);"></div>
+<div id="co-drawer"
+     style="position:fixed;bottom:0;left:0;right:0;max-width:540px;margin:0 auto;
+            background:#fff;border-radius:24px 24px 0 0;z-index:1101;
+            padding:0 24px 44px;
+            transform:translateY(100%);
+            transition:transform .32s cubic-bezier(.32,.72,0,1);
+            box-shadow:0 -8px 40px rgba(0,0,0,.18);">
+  <div style="display:flex;justify-content:center;padding:14px 0 22px;">
+    <div style="width:40px;height:4px;border-radius:2px;background:#e2e8f0;"></div>
+  </div>
+  <p style="font-size:20px;font-weight:800;color:#0f172a;margin:0 0 4px;">Tu contraoferta</p>
+  <p id="co-context" style="font-size:13px;color:#94a3b8;margin:0 0 24px;"></p>
+  <div style="position:relative;margin-bottom:14px;">
+    <span style="position:absolute;left:18px;top:50%;transform:translateY(-50%);
+                 font-size:20px;font-weight:700;color:#94a3b8;pointer-events:none;">S/</span>
+    <input type="number" id="co-input" placeholder="0" min="1"
+           style="width:100%;padding:18px 18px 18px 52px;border-radius:14px;
+                  border:2px solid #e2e8f0;font-size:24px;font-weight:800;color:#0f172a;
+                  box-sizing:border-box;font-family:inherit;background:#f8fafc;outline:none;
+                  -moz-appearance:textfield;appearance:textfield;"
+           oninput="this.style.borderColor='#e2e8f0'" />
+  </div>
+  <button onclick="submitCounterDrawer()"
+          style="width:100%;padding:17px;border-radius:14px;border:none;
+                 background:var(--baltic);color:#fff;font-size:15px;font-weight:700;
+                 cursor:pointer;font-family:inherit;letter-spacing:.02em;">
+    Enviar contraoferta
+  </button>
 </div>
 
 </body>
