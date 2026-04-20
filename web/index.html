@@ -416,6 +416,16 @@
         }
         #img-modal-dots-bar .igc-dot { pointer-events:all; cursor:pointer; }
 
+        /* ── Inbox skeleton loading ── */
+        @keyframes shimmer { from { background-position:-600px 0; } to { background-position:600px 0; } }
+        .skel {
+            background: linear-gradient(90deg,#f0f4f8 25%,#e4e8ed 50%,#f0f4f8 75%);
+            background-size: 1200px 100%;
+            animation: shimmer 1.5s infinite linear;
+            border-radius: 6px;
+        }
+        .inbox-skel-row { display:flex; align-items:center; gap:14px; padding:14px 20px; border-bottom:1px solid #f8f9fa; }
+
         /* ── Toast notifications ── */
         @keyframes toast-in  { from { opacity:0; transform:translateY(-14px) scale(.96); } to { opacity:1; transform:translateY(0) scale(1); } }
         @keyframes toast-out { from { opacity:1; transform:translateY(0) scale(1); } to { opacity:0; transform:translateY(-10px) scale(.96); } }
@@ -1749,6 +1759,26 @@ function showTab(tab) {
         requireAuth(function() { showTab(tab); });
         return;
     }
+
+    /* ── Dismiss ALL overlay views unconditionally ── */
+    var chatView   = document.getElementById('chat-view');
+    var prodView   = document.getElementById('product-view');
+    var sellerView = document.getElementById('seller-profile-view');
+    var coDrawer   = document.getElementById('co-drawer');
+    var imgModal   = document.getElementById('img-modal');
+
+    if (chatView   && chatView.classList.contains('active'))   closeChat();
+    if (prodView   && prodView.classList.contains('active'))   closeProduct();
+    if (sellerView && sellerView.classList.contains('active')) closeSellerProfile();
+    if (coDrawer)  closeCounterDrawer();
+    if (imgModal && imgModal.classList.contains('open')) closeImgModal();
+
+    /* ── Make sure bottom-nav is visible (chat hides it) ── */
+    document.getElementById('bottom-nav').style.display = 'flex';
+
+    /* ── Same-tab tap: scroll to top + reload data ── */
+    var alreadyHere = currentTab === tab;
+
     ['home-view','saved-view','messages-view','profile-view'].forEach(function(id) {
         document.getElementById(id).classList.remove('active');
     });
@@ -1758,6 +1788,13 @@ function showTab(tab) {
     currentTab = tab;
     document.getElementById(tab + '-view').classList.add('active');
     document.getElementById('tab-' + tab).classList.add('active-tab');
+
+    if (tab === 'home') {
+        var grid = document.getElementById('productGrid');
+        if (grid) grid.scrollTop = 0;
+        window.scrollTo({ top: 0, behavior: alreadyHere ? 'smooth' : 'auto' });
+        if (alreadyHere) fetchProducts();
+    }
     if (tab === 'messages') { _inboxStale = false; loadConversations(); refreshUnreadBadge(); }
     if (tab === 'profile')  loadProfile();
     if (tab === 'saved')    loadFavorites();
@@ -2900,16 +2937,36 @@ function _bindInboxRefresh() {
 }
 var _inboxStale = false;
 
+function _renderInboxSkeleton() {
+    var list = document.getElementById('chatList');
+    list.innerHTML = '';
+    for (var i = 0; i < 5; i++) {
+        var row = document.createElement('div');
+        row.className = 'inbox-skel-row';
+        row.innerHTML =
+            '<div class="skel" style="width:48px;height:48px;border-radius:50%;flex-shrink:0;"></div>' +
+            '<div style="flex:1;min-width:0;">' +
+                '<div class="skel" style="height:13px;width:55%;margin-bottom:8px;"></div>' +
+                '<div class="skel" style="height:12px;width:78%;"></div>' +
+            '</div>' +
+            '<div class="skel" style="width:28px;height:10px;flex-shrink:0;"></div>';
+        list.appendChild(row);
+    }
+}
+
 function loadConversations() {
     if (!currentUser) return;
     _inboxStale = false;
-    var list = document.getElementById('chatList');
-    list.innerHTML = '<p style="text-align:center;padding:48px 0;font-size:13px;color:#b0b5bf;">Cargando…</p>';
+    _renderInboxSkeleton();
 
+    /* ── Single query: messages + embedded profiles (eliminates a round trip) ── */
     sb.from('messages')
-        .select('id, sender_id, receiver_id, content, created_at, product_id, read')
+        .select('id, sender_id, receiver_id, content, created_at, product_id, read,' +
+                'sender:profiles!sender_id(username, avatar_url),' +
+                'receiver:profiles!receiver_id(username, avatar_url)')
         .or('sender_id.eq.' + currentUser.id + ',receiver_id.eq.' + currentUser.id)
         .order('created_at', { ascending: false })
+        .limit(200)
         .then(function(r) {
             if (r.error) {
                 console.error('[loadConversations] messages query FAILED', r.error);
@@ -2918,62 +2975,55 @@ function loadConversations() {
             if (!r.data || r.data.length === 0) {
                 renderConversationsEmpty(); return;
             }
-            // Deduplicar por (otherId + productId) — una entrada por conversación/producto
-            // Contar no leídos en una sola pasada sobre todos los mensajes
+
             var seen = {}, convos = [], unreadMap = {};
             r.data.forEach(function(msg) {
-                var otherId = msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id;
-                var key     = otherId + '_' + (msg.product_id || 'none');
-                // Acumular mensajes que yo recibí y no he leído aún
+                var iAmSender = msg.sender_id === currentUser.id;
+                var otherId   = iAmSender ? msg.receiver_id : msg.sender_id;
+                var key       = otherId + '_' + (msg.product_id || 'none');
                 if (msg.receiver_id === currentUser.id && !msg.read) {
                     unreadMap[key] = (unreadMap[key] || 0) + 1;
                 }
                 if (!seen[key]) {
                     seen[key] = true;
+                    /* Profile data comes embedded — no extra query needed */
+                    var otherProf = iAmSender ? msg.receiver : msg.sender;
                     convos.push({
-                        otherId:       otherId,
-                        productId:     msg.product_id || null,
-                        preview:       msg.content,
-                        time:          formatRelTime(msg.created_at),
-                        lastSenderIsMe: msg.sender_id === currentUser.id,
-                        unread:        0
+                        otherId:        otherId,
+                        productId:      msg.product_id || null,
+                        preview:        msg.content,
+                        time:           formatRelTime(msg.created_at),
+                        lastSenderIsMe: iAmSender,
+                        unread:         0,
+                        otherName:      (otherProf && otherProf.username)   || null,
+                        otherAvatar:    (otherProf && otherProf.avatar_url) || null
                     });
                 }
             });
-            // Asignar conteo de no leídos a cada conversación
             convos.forEach(function(c) {
                 c.unread = unreadMap[c.otherId + '_' + (c.productId || 'none')] || 0;
             });
 
-            // Perfiles de los otros usuarios
-            var otherIds   = convos.map(function(c) { return c.otherId; });
             var productIds = convos.map(function(c) { return c.productId; }).filter(Boolean);
-
-            var profilePromise = sb.from('profiles').select('id, username, avatar_url').in('id', otherIds);
-            var productPromise = productIds.length
+            (productIds.length
                 ? sb.from('products').select('id, title, image_url, price, seller_id, status').in('id', productIds)
-                : Promise.resolve({ data: [] });
-
-            Promise.all([profilePromise, productPromise]).then(function(results) {
-                var pr = results[0], prod = results[1];
-                if (pr.error)   console.error('[loadConversations] profiles query FAILED', pr.error);
+                : Promise.resolve({ data: [] })
+            ).then(function(prod) {
                 if (prod.error) console.error('[loadConversations] products query FAILED', prod.error);
-                var profileMap = {}, productMap = {};
-                (pr.data   || []).forEach(function(p) { profileMap[p.id] = p; });
+                var productMap = {};
                 (prod.data || []).forEach(function(p) { productMap[p.id] = p; });
-                renderConversationList(convos, profileMap, productMap);
+                renderConversationList(convos, productMap);
             });
         });
 }
 
-function renderConversationList(convos, profileMap, productMap) {
+function renderConversationList(convos, productMap) {
     var list = document.getElementById('chatList');
     list.innerHTML = '';
     convos.forEach(function(c) {
-        var prof    = (profileMap && profileMap[c.otherId])   || {};
         var prod    = (productMap && productMap[c.productId]) || {};
-        var name    = prof.username || ('Usuario #' + c.otherId.slice(0, 6));
-        var avatar  = prof.avatar_url || avatarDataUrl(name);
+        var name    = c.otherName   || ('Usuario #' + c.otherId.slice(0, 6));
+        var avatar  = c.otherAvatar || avatarDataUrl(name);
         var prodTitle    = prod.title     || null;
         var prodImg      = prod.image_url || null;
         var prodPrice    = prod.price != null ? 'S/ ' + Number(prod.price).toLocaleString('es-PE') : null;
