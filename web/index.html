@@ -449,9 +449,45 @@
 
         /* ── Msg unread badge ── */
         .nav-badge { position: absolute; top: 6px; right: calc(50% - 18px); width: 8px; height: 8px; border-radius: 50%; background: #ef4444; border: 2px solid #fff; display: none; }
+
+        /* ── Splash screen ── */
+        #splash {
+            position: fixed; inset: 0; background: #1a6e8e;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 9999; pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        #splash span {
+            font-size: 48px; font-weight: 800; color: #fff;
+            letter-spacing: -.5px; font-family: inherit;
+        }
+        #splash-cover {
+            position: absolute; inset: 0; background: #fff;
+            transform-origin: top;
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #splash.reveal #splash-cover { transform: scaleY(0); }
+        #splash.hide { opacity: 0; }
+        #splash.gone { display: none; }
     </style>
 </head>
 <body>
+
+<div id="splash"><span>tirgus</span><div id="splash-cover"></div></div>
+<script>
+    (function() {
+        var s = document.getElementById('splash');
+        // Revelar: cover se pliega hacia arriba en 0.5s
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() { s.classList.add('reveal'); });
+        });
+        // 0.5s reveal + 0.4s pausa = 0.9s → fade out en 0.3s
+        setTimeout(function() {
+            s.classList.add('hide');
+            s.addEventListener('transitionend', function() { s.classList.add('gone'); }, { once: true });
+        }, 900);
+    })();
+</script>
 
 <!-- ── Toast container ── -->
 <div id="toast-container"
@@ -520,23 +556,30 @@
 </div>
 
 <!-- ═══════════════════════════════
-     GUARDADOS
+     CHOLLOS
 ══════════════════════════════════ -->
-<div id="saved-view" class="view">
-    <div class="max-w-md mx-auto">
-        <div class="sticky top-0 bg-white border-b border-slate-100 px-4 py-3 z-20 flex items-center gap-3">
-            <button onclick="showTab('home')" class="text-slate-500" style="background:none;border:none;cursor:pointer;padding:4px;display:flex;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/>
-                </svg>
-            </button>
-            <h1 class="text-xl font-bold text-slate-900 flex-1">Guardados</h1>
-            <span id="saved-count-label" style="font-size:13px;color:#94a3b8;"></span>
+<div id="saved-view" class="view" style="background:#f7f8fa;">
+    <div class="max-w-md mx-auto" style="display:flex;flex-direction:column;min-height:100%;">
+        <div style="padding:14px 20px 10px;background:#fff;border-bottom:1px solid #f0f2f5;display:flex;align-items:center;justify-content:space-between;">
+            <div>
+                <h1 style="font-size:22px;font-weight:800;color:#1a1a2e;margin:0;">Remates</h1>
+                <p style="font-size:12px;color:#94a3b8;margin:3px 0 0;">Descuentos del 30% o más</p>
+            </div>
+            <button onclick="_openRematesPanel()" style="background:none;border:1px solid #e2e8f0;border-radius:20px;padding:6px 13px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;">Guardados ❤️</button>
         </div>
-        <div style="padding:16px;">
-            <div id="savedGrid" class="grid grid-cols-2" style="gap:12px;"></div>
-        </div>
+        <div id="chollos-stack" style="flex:1;display:flex;flex-direction:column;align-items:center;padding:28px 16px 90px;"></div>
     </div>
+</div>
+
+<!-- Panel Guardados Remates -->
+<div id="remates-panel" style="display:none;position:fixed;inset:0;z-index:200;background:#f7f8fa;flex-direction:column;">
+    <div style="padding:14px 20px;background:#fff;border-bottom:1px solid #f0f2f5;display:flex;align-items:center;gap:12px;">
+        <button onclick="_closeRematesPanel()" style="background:none;border:none;cursor:pointer;padding:4px;display:flex;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        </button>
+        <h2 style="font-size:18px;font-weight:700;color:#1a1a2e;margin:0;">Guardados</h2>
+    </div>
+    <div id="remates-fav-grid" style="flex:1;overflow-y:auto;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;padding-bottom:80px;align-content:start;"></div>
 </div>
 
 <!-- ═══════════════════════════════
@@ -757,7 +800,10 @@
                     onpointerleave="this.style.opacity='1'">
                 <img id="chatAvatar" src="" alt="" class="w-9 h-9 rounded-full object-cover flex-shrink-0">
                 <div style="flex:1;min-width:0;">
-                    <p id="chatName" class="font-semibold text-slate-900 text-sm truncate"></p>
+                    <div style="display:flex;align-items:center;gap:4px;">
+                        <p id="chatName" class="font-semibold text-slate-900 text-sm truncate" style="margin:0;"></p>
+                        <span id="chatTrustBadge" style="flex-shrink:0;line-height:0;"></span>
+                    </div>
                     <p style="font-size:10px;color:var(--baltic);font-weight:500;margin-top:1px;">Ver perfil</p>
                 </div>
             </button>
@@ -997,11 +1043,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
         Explorar
     </button>
-    <!-- Guardados -->
+    <!-- Remates -->
     <button id="tab-saved" onclick="showTab('saved')" style="position:relative;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
-        Guardados
-        <span id="saved-badge" style="display:none;position:absolute;top:6px;right:calc(50% - 16px);min-width:16px;height:16px;background:var(--baltic);color:#fff;border-radius:99px;font-size:9px;font-weight:700;line-height:16px;text-align:center;padding:0 3px;"></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        Remates
     </button>
     <!-- Mensajes -->
     <button id="tab-messages" onclick="showTab('messages')" style="position:relative;">
@@ -1464,6 +1509,28 @@ function clearUserUI() {
 }
 
 /* ══════════════════
+   TRUST BADGES
+══════════════════ */
+function _trustBadgeHtml(phoneVerified, salesCount, rating) {
+    var trusted = (salesCount >= 5 && rating >= 4.0);
+    if (trusted) {
+        /* Green verified badge — badge icon with checkmark */
+        return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;" title="Vendedor de confianza">' +
+               '<path stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
+               'd="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-.723 3.066 3.745 3.745 0 01-3.066.723A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.066-.723 3.746 3.746 0 01-.723-3.066A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.746 3.746 0 01.723-3.066 3.746 3.746 0 013.066-.723A3.745 3.745 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.066.723 3.746 3.746 0 01.723 3.066A3.745 3.745 0 0121 12z"/>' +
+               '</svg>';
+    }
+    if (phoneVerified) {
+        /* Gray circle check — phone verified */
+        return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;" title="Teléfono verificado">' +
+               '<path stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
+               'd="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>' +
+               '</svg>';
+    }
+    return '';
+}
+
+/* ══════════════════
    ESTRELLAS
 ══════════════════ */
 function renderStars(rating) {
@@ -1755,7 +1822,7 @@ function loginWithGoogle() {
 ══════════════════ */
 function showTab(tab) {
     // Estas vistas requieren login
-    if ((tab === 'messages' || tab === 'profile' || tab === 'saved') && !isLoggedIn) {
+    if ((tab === 'messages' || tab === 'profile') && !isLoggedIn) {
         requireAuth(function() { showTab(tab); });
         return;
     }
@@ -1775,6 +1842,8 @@ function showTab(tab) {
 
     /* ── Make sure bottom-nav is visible (chat hides it) ── */
     document.getElementById('bottom-nav').style.display = 'flex';
+
+    localStorage.setItem('activeTab', tab);
 
     /* ── Same-tab tap: scroll to top + reload data ── */
     var alreadyHere = currentTab === tab;
@@ -1797,7 +1866,7 @@ function showTab(tab) {
     }
     if (tab === 'messages') { _inboxStale = false; loadConversations(); refreshUnreadBadge(); }
     if (tab === 'profile')  loadProfile();
-    if (tab === 'saved')    loadFavorites();
+    if (tab === 'saved')    loadChollos();
 }
 
 /* ══════════════════
@@ -1822,8 +1891,8 @@ function openSellerProfile(sellerId) {
     document.getElementById('bottom-nav').style.display = 'none';
 
     Promise.all([
-        sb.from('profiles').select('username, avatar_url, location').eq('id', sellerId).maybeSingle(),
-        sb.from('products').select('id, title, image_url, price, status').eq('seller_id', sellerId).eq('status', 'available').order('created_at', { ascending: false }),
+        sb.from('profiles').select('username, avatar_url, location, phone_verified, sales_count, rating').eq('id', sellerId).maybeSingle(),
+        sb.from('products').select('id, title, image_url, price, status').eq('seller_id', sellerId).eq('status', 'available').eq('is_hidden', false).order('created_at', { ascending: false }),
         sb.from('reviews').select('rating, comment, created_at, product_id').eq('seller_id', sellerId).order('created_at', { ascending: false })
     ]).then(function(res) {
         var prof     = res[0].data || {};
@@ -1834,6 +1903,7 @@ function openSellerProfile(sellerId) {
         var init  = name.charAt(0).toUpperCase();
         var count = reviews.length;
         var avg   = count > 0 ? reviews.reduce(function(s, r) { return s + (r.rating || 0); }, 0) / count : 0;
+        var trustBadge = _trustBadgeHtml(prof.phone_verified, prof.sales_count || 0, avg);
 
         var avatarHtml = prof.avatar_url
             ? '<img src="' + prof.avatar_url + '" style="width:76px;height:76px;border-radius:50%;object-fit:cover;border:3px solid var(--baltic-light);">'
@@ -1842,7 +1912,10 @@ function openSellerProfile(sellerId) {
         document.getElementById('seller-profile-header').innerHTML =
             '<div style="display:flex;flex-direction:column;align-items:center;padding:28px 16px 22px;background:#fff;">' +
                 avatarHtml +
-                '<h2 style="font-size:19px;font-weight:800;color:#1a1a2e;margin-top:11px;letter-spacing:-.01em;">' + escapeHtml(name) + '</h2>' +
+                '<div style="display:flex;align-items:center;gap:5px;margin-top:11px;">' +
+                    '<h2 style="font-size:19px;font-weight:800;color:#1a1a2e;letter-spacing:-.01em;margin:0;">' + escapeHtml(name) + '</h2>' +
+                    trustBadge +
+                '</div>' +
                 (prof.location ? '<p style="font-size:12px;color:#94a3b8;margin-top:3px;display:flex;align-items:center;gap:4px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>' + escapeHtml(prof.location) + '</p>' : '') +
                 '<div style="display:flex;align-items:center;gap:5px;margin-top:9px;">' +
                     '<div style="display:inline-flex;gap:1px;">' + renderStars(avg) + '</div>' +
@@ -1955,6 +2028,10 @@ function showSellerTab(tab) {
 function openProduct(id) {
     var p = PRODUCTS[id];
     if (!p) return;
+    if (p.is_hidden) {
+        alert('Este anuncio no está disponible porque infringe las normas de Tirgus.');
+        return;
+    }
     history.pushState({ productId: id }, '', '?product=' + id);
     var stars    = '★'.repeat(Math.round(p.rating)) + '☆'.repeat(5 - Math.round(p.rating));
     var init     = p.seller.charAt(0).toUpperCase();
@@ -1964,6 +2041,16 @@ function openProduct(id) {
         : '<div style="width:44px;height:44px;border-radius:50%;background:var(--baltic);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px;flex-shrink:0;">' + init + '</div>';
 
     var galImages = (p.images && p.images.length > 0) ? p.images : (p.image ? [p.image] : []);
+    var isOwner = isLoggedIn && currentUser && p.seller_id === currentUser.id;
+    var reportLink = (!isOwner && p.db_id)
+        ? '<div style="text-align:center;padding:16px 0 4px;">' +
+              '<button onclick="openReportSheet(\'' + p.db_id + '\')" ' +
+              'style="background:none;border:none;font-size:12px;color:#b0b5bf;cursor:pointer;' +
+              'text-decoration:underline;font-family:inherit;padding:4px 8px;">' +
+              'Denunciar anuncio</button>' +
+          '</div>'
+        : '';
+
     document.getElementById('productViewTitle').textContent = p.title;
     document.getElementById('productViewContent').innerHTML =
         buildCarousel(galImages, id) +
@@ -1980,17 +2067,20 @@ function openProduct(id) {
             '<div class="bg-slate-50 rounded-xl p-4 flex items-center gap-3" style="cursor:pointer;" onclick="openSellerProfile(\'' + (p.seller_id || '') + '\')">' +
                 sellerAv +
                 '<div style="flex:1;min-width:0;">' +
-                    '<p class="font-semibold text-slate-900 text-sm">' + escapeHtml(p.seller) + '</p>' +
+                    '<div style="display:flex;align-items:center;gap:4px;">' +
+                        '<p class="font-semibold text-slate-900 text-sm" style="margin:0;">' + escapeHtml(p.seller) + '</p>' +
+                        _trustBadgeHtml(p.seller_phone_verified, p.seller_sales_count, p.seller_rating) +
+                    '</div>' +
                     '<p class="stars text-sm">' + stars + ' <span class="text-slate-400 text-xs font-normal">' + p.rating + ' (' + p.reviews + ' reseñas)</span></p>' +
                     '<p style="font-size:11px;color:var(--baltic);font-weight:500;margin-top:2px;">Ver perfil →</p>' +
                 '</div>' +
             '</div>' +
+            reportLink +
         '</div>';
 
     _setupCarouselScroll(galImages);
 
-    // Sticky action bar — role-based buttons
-    var isOwner = isLoggedIn && currentUser && p.seller_id === currentUser.id;
+    // Sticky action bar — role-based buttons (isOwner already computed above)
     var bar = document.getElementById('productActionBar');
     if (isOwner) {
         bar.innerHTML =
@@ -2020,10 +2110,20 @@ function closeProduct() {
 function openProductById(dbId) {
     // Check if already cached
     var cacheKey = 'db_' + dbId;
-    if (PRODUCTS[cacheKey]) { openProduct(cacheKey); return; }
-    sb.from('products').select('*, profiles(username, avatar_url, location)').eq('id', dbId).maybeSingle()
+    if (PRODUCTS[cacheKey]) {
+        if (PRODUCTS[cacheKey].is_hidden) {
+            alert('Este anuncio no está disponible porque infringe las normas de Tirgus.');
+            return;
+        }
+        openProduct(cacheKey); return;
+    }
+    sb.from('products').select('*, profiles(username, avatar_url, location, phone_verified, sales_count, rating)').eq('id', dbId).maybeSingle()
         .then(function(r) {
             if (!r.data) return;
+            if (r.data.is_hidden) {
+                alert('Este anuncio no está disponible porque infringe las normas de Tirgus.');
+                return;
+            }
             var p = r.data;
             var prof = p.profiles || {};
             var priceLabel = p.price != null ? 'S/ ' + (typeof p.price === 'number' ? p.price.toLocaleString('es-PE') : p.price) : '';
@@ -2036,11 +2136,14 @@ function openProductById(dbId) {
                 images:            _imgs,
                 desc:              p.description || '',
                 location:          p.location || prof.location || '',
-                seller:            prof.username || 'Vendedor',
-                seller_id:         p.seller_id || null,
-                seller_avatar_url: prof.avatar_url || null,
-                rating:            p.rating || 5.0,
-                reviews:           p.reviews || 0,
+                seller:                prof.username       || 'Vendedor',
+                seller_id:             p.seller_id         || null,
+                seller_avatar_url:     prof.avatar_url     || null,
+                seller_phone_verified: prof.phone_verified || false,
+                seller_sales_count:    prof.sales_count    || 0,
+                seller_rating:         prof.rating         || 0,
+                rating:                p.rating            || 0,
+                reviews:               p.reviews           || 0,
                 category:          p.category || '',
                 condition:         p.condition || '',
                 status:            p.status || 'available',
@@ -2207,6 +2310,15 @@ function openChat(otherId, otherName, otherAvatar, productId, productTitle, prod
     avatarEl.src = otherAvatar || avatarDataUrl(otherName);
     avatarEl.onerror = function() { this.src = avatarDataUrl(otherName); };
     document.getElementById('chatName').textContent = otherName || 'Usuario';
+    document.getElementById('chatTrustBadge').innerHTML = ''; // clear while loading
+    // Async: fetch trust data and inject badge without blocking chat open
+    sb.from('profiles').select('phone_verified, sales_count, rating').eq('id', otherId).maybeSingle()
+        .then(function(pr) {
+            var d = pr.data || {};
+            var badge = _trustBadgeHtml(d.phone_verified, d.sales_count || 0, d.rating || 0);
+            var el = document.getElementById('chatTrustBadge');
+            if (el) el.innerHTML = badge;
+        });
 
     // Product header card
     var hdr = document.getElementById('chatProductHeader');
@@ -2506,6 +2618,89 @@ function closeCounterDrawer() {
     document.getElementById('co-overlay').style.display = 'none';
     var inp = document.getElementById('co-input');
     if (inp) inp.value = '';
+}
+
+/* ══════════════════════════════════
+   REPORT / DENUNCIA
+══════════════════════════════════ */
+var _reportProductId = null;
+var REPORT_REASONS = ['Estafa', 'Producto prohibido', 'Ofensivo', 'Vendedor falso'];
+
+function openReportSheet(productDbId) {
+    if (!isLoggedIn) { requireAuth(function() { openReportSheet(productDbId); }); return; }
+    _reportProductId = productDbId;
+    var container = document.getElementById('report-reasons');
+    container.innerHTML = '';
+    REPORT_REASONS.forEach(function(reason) {
+        var btn = document.createElement('button');
+        btn.textContent = reason;
+        btn.style.cssText =
+            'width:100%;padding:15px 18px;border-radius:14px;border:1.5px solid #e2e8f0;' +
+            'background:#fff;font-size:14px;font-weight:600;color:#1a1a2e;cursor:pointer;' +
+            'text-align:left;font-family:inherit;transition:background .12s,border-color .12s;';
+        btn.onpointerdown = function() { this.style.background = '#f8fafc'; this.style.borderColor = 'var(--baltic)'; };
+        btn.onpointerup   = function() { this.style.background = '#fff';    this.style.borderColor = '#e2e8f0'; };
+        btn.onclick = function() { submitReport(productDbId, reason); };
+        container.appendChild(btn);
+    });
+    document.getElementById('report-overlay').style.display = 'block';
+    document.getElementById('report-sheet').style.transform = 'translateY(0)';
+}
+
+function closeReportSheet() {
+    document.getElementById('report-sheet').style.transform  = 'translateY(100%)';
+    document.getElementById('report-overlay').style.display = 'none';
+    _reportProductId = null;
+}
+
+function submitReport(productDbId, reason) {
+    if (!currentUser || !productDbId) return;
+    closeReportSheet();
+    sb.from('reports').insert({
+        product_id:  productDbId,
+        reporter_id: currentUser.id,
+        reason:      reason
+    }).then(function(r) {
+        if (r.error) {
+            if (r.error.code === '23505') {
+                _showInfoToast('Ya has reportado este anuncio.');
+            } else {
+                console.error('[submitReport]', r.error);
+                _showInfoToast('No se pudo enviar la denuncia. Inténtalo de nuevo.');
+            }
+            return;
+        }
+        _showSuccessToast('Gracias por tu denuncia. La revisaremos pronto.');
+    });
+}
+
+function _showSuccessToast(msg) {
+    var container = document.getElementById('toast-container');
+    if (!container) return;
+    var t = document.createElement('div');
+    t.className = 'tirgus-toast';
+    t.style.background = '#16a34a';
+    t.innerHTML =
+        '<div class="t-avatar" style="background:rgba(255,255,255,.25);font-size:18px;">✓</div>' +
+        '<div class="t-body"><p class="t-name" style="font-size:13px;font-weight:600;">' + escapeHtml(msg) + '</p></div>';
+    t.onclick = function() { _removeToast(t); };
+    container.appendChild(t);
+    var timer = setTimeout(function() { _removeToast(t); }, 4000);
+    t._timer = timer;
+}
+
+function _showInfoToast(msg) {
+    var container = document.getElementById('toast-container');
+    if (!container) return;
+    var t = document.createElement('div');
+    t.className = 'tirgus-toast';
+    t.innerHTML =
+        '<div class="t-avatar" style="background:rgba(255,255,255,.15);font-size:16px;">ℹ</div>' +
+        '<div class="t-body"><p class="t-name" style="font-size:13px;font-weight:600;">' + escapeHtml(msg) + '</p></div>';
+    t.onclick = function() { _removeToast(t); };
+    container.appendChild(t);
+    var timer = setTimeout(function() { _removeToast(t); }, 4000);
+    t._timer = timer;
 }
 
 function submitCounterDrawer() {
@@ -2962,8 +3157,8 @@ function loadConversations() {
     /* ── Single query: messages + embedded profiles (eliminates a round trip) ── */
     sb.from('messages')
         .select('id, sender_id, receiver_id, content, created_at, product_id, read,' +
-                'sender:profiles!sender_id(username, avatar_url),' +
-                'receiver:profiles!receiver_id(username, avatar_url)')
+                'sender:profiles!sender_id(username, avatar_url, phone_verified, sales_count, rating),' +
+                'receiver:profiles!receiver_id(username, avatar_url, phone_verified, sales_count, rating)')
         .or('sender_id.eq.' + currentUser.id + ',receiver_id.eq.' + currentUser.id)
         .order('created_at', { ascending: false })
         .limit(200)
@@ -3006,7 +3201,7 @@ function loadConversations() {
 
             var productIds = convos.map(function(c) { return c.productId; }).filter(Boolean);
             (productIds.length
-                ? sb.from('products').select('id, title, image_url, price, seller_id, status').in('id', productIds)
+                ? sb.from('products').select('id, title, image_url, price, seller_id, status').in('id', productIds).or('is_hidden.eq.false,is_hidden.is.null')
                 : Promise.resolve({ data: [] })
             ).then(function(prod) {
                 if (prod.error) console.error('[loadConversations] products query FAILED', prod.error);
@@ -3344,6 +3539,345 @@ function fetchUserFavorites() {
         });
 }
 
+/* ══════════════════
+   CHOLLOS
+══════════════════ */
+var _chollosQueue = [];
+var _chollosIdx   = 0;
+
+function loadChollos() {
+    var stack = document.getElementById('chollos-stack');
+    if (!stack) return;
+    stack.innerHTML = '<p style="font-size:13px;color:#b0b5bf;text-align:center;padding-top:60px;">Cargando remates…</p>';
+
+    sb.from('products')
+        .select('*')
+        .eq('status', 'available')
+        .eq('is_hidden', false)
+        .not('original_price', 'is', null)
+        .limit(30)
+        .then(function(r) {
+            if (r.error || !r.data) {
+                stack.innerHTML = '<p style="font-size:13px;color:#b0b5bf;text-align:center;padding-top:60px;">No se pudieron cargar los remates.</p>';
+                return;
+            }
+            var allProds = r.data.filter(function(p) {
+                return !(currentUser && p.seller_id === currentUser.id);
+            }).slice(0, 30);
+
+            if (allProds.length === 0) {
+                stack.innerHTML = '<p style="text-align:center;padding:60px 0;font-size:13px;color:#b0b5bf;">Sin remates disponibles.</p>';
+                return;
+            }
+
+            fetch('https://kwejkzojjuxceogdihio.supabase.co/functions/v1/clever-worker', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ products: allProds.map(function(p) {
+                    return { title: p.title, price: p.price, original_price: p.original_price || null };
+                })})
+            }).then(function(res) { return res.json(); }).then(function(aiRes) {
+                var titles = aiRes.titles || [];
+                var filtered = allProds.filter(function(p) {
+                    return titles.indexOf(p.title) !== -1;
+                });
+                if (filtered.length === 0) filtered = allProds.slice(0, 8);
+                var sellerIds = filtered.map(function(p) { return p.seller_id; }).filter(Boolean);
+                var unique = sellerIds.filter(function(v, i, a) { return a.indexOf(v) === i; });
+                (unique.length
+                    ? sb.from('profiles').select('id, username, avatar_url').in('id', unique)
+                    : Promise.resolve({ data: [] })
+                ).then(function(pr) {
+                    var pm = {};
+                    (pr.data || []).forEach(function(prof) { pm[prof.id] = prof; });
+                    _chollosQueue = filtered.map(function(p) {
+                        var prof = pm[p.seller_id] || {};
+                        return Object.assign({}, p, {
+                            seller_name: prof.username || p.seller_name,
+                            seller_avatar_url: prof.avatar_url || null
+                        });
+                    });
+                    _chollosIdx = 0;
+                    _renderChollosStack();
+                });
+            }).catch(function() {
+                var filtered = allProds.slice(0, 8);
+                var sellerIds = filtered.map(function(p) { return p.seller_id; }).filter(Boolean);
+                var unique = sellerIds.filter(function(v, i, a) { return a.indexOf(v) === i; });
+                (unique.length
+                    ? sb.from('profiles').select('id, username, avatar_url').in('id', unique)
+                    : Promise.resolve({ data: [] })
+                ).then(function(pr) {
+                    var pm = {};
+                    (pr.data || []).forEach(function(prof) { pm[prof.id] = prof; });
+                    _chollosQueue = filtered.map(function(p) {
+                        var prof = pm[p.seller_id] || {};
+                        return Object.assign({}, p, {
+                            seller_name: prof.username || null,
+                            seller_avatar_url: prof.avatar_url || null
+                        });
+                    });
+                    _chollosIdx = 0;
+                    _renderChollosStack();
+                });
+            });
+        });
+}
+
+function _renderChollosStack() {
+    var stack = document.getElementById('chollos-stack');
+    if (!stack) return;
+    stack.innerHTML = '';
+
+    if (_chollosQueue.length === 0) {
+        stack.innerHTML =
+            '<div style="text-align:center;padding:60px 24px;">' +
+                '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.3" style="margin:0 auto 16px;display:block;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>' +
+                '<p style="font-size:15px;font-weight:700;color:#374151;margin-bottom:6px;">Sin remates disponibles</p>' +
+                '<p style="font-size:13px;color:#94a3b8;line-height:1.6;">Vuelve más tarde, ¡aparecerán nuevas ofertas!</p>' +
+            '</div>';
+        return;
+    }
+
+    if (_chollosIdx >= _chollosQueue.length) {
+        stack.innerHTML =
+            '<div style="text-align:center;padding:60px 24px;">' +
+                '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.3" style="margin:0 auto 16px;display:block;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>' +
+                '<p style="font-size:15px;font-weight:700;color:#374151;margin-bottom:6px;">¡Eso es todo por hoy!</p>' +
+                '<p style="font-size:13px;color:#94a3b8;line-height:1.6;">Has visto todos los remates.<br>' +
+                '<button onclick="loadChollos()" style="background:none;border:none;color:var(--baltic);font-size:13px;cursor:pointer;font-family:inherit;text-decoration:underline;padding:0;margin-top:4px;">Ver de nuevo</button></p>' +
+            '</div>';
+        return;
+    }
+
+    var p       = _chollosQueue[_chollosIdx];
+    var disc    = Math.round((p.original_price - p.price) / p.original_price * 100);
+    var prof    = p.seller || {};
+    var selName = prof.username || p.seller_name || 'Vendedor';
+    var imgSrc  = (p.images && p.images[0]) || p.image_url || '';
+    var priceLbl = 'S/ ' + Number(p.price).toLocaleString('es-PE');
+    var origLbl  = 'S/ ' + Number(p.original_price).toLocaleString('es-PE');
+    var remaining = _chollosQueue.length - _chollosIdx;
+
+    /* ── Background shadow cards ── */
+    var wrapOuter = document.createElement('div');
+    wrapOuter.style.cssText = 'position:relative;width:100%;max-width:360px;';
+
+    for (var bi = Math.min(2, remaining - 1); bi >= 1; bi--) {
+        var bg = document.createElement('div');
+        bg.style.cssText =
+            'position:absolute;top:' + (bi * 8) + 'px;left:' + (bi * 6) + 'px;right:' + (bi * 6) + 'px;' +
+            'height:100%;border-radius:20px;background:#fff;' +
+            'box-shadow:0 4px 12px rgba(0,0,0,0.07);z-index:' + (10 - bi) + ';';
+        wrapOuter.appendChild(bg);
+    }
+
+    /* ── Active card ── */
+    var card = document.createElement('div');
+    card.className = 'chollo-card-active';
+    card.style.cssText = 'position:relative;width:100%;border-radius:20px;background:#fff;' +
+        'box-shadow:0 8px 28px rgba(0,0,0,0.13);overflow:hidden;cursor:grab;user-select:none;' +
+        'z-index:20;touch-action:pan-y;';
+
+    card.innerHTML =
+        '<div style="position:relative;">' +
+            (imgSrc
+                ? '<img src="' + escapeHtml(imgSrc) + '" alt="" style="width:100%;height:290px;object-fit:cover;display:block;">'
+                : '<div style="width:100%;height:290px;background:#e6f3f8;display:flex;align-items:center;justify-content:center;">' +
+                  '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#b0cfe0" stroke-width="1.3"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>') +
+            '<span style="position:absolute;top:14px;right:14px;background:#22c55e;color:#fff;font-weight:800;font-size:14px;padding:5px 12px;border-radius:99px;">-' + disc + '%</span>' +
+        '</div>' +
+        '<div style="padding:18px 20px 20px;">' +
+            '<p style="font-size:16px;font-weight:700;color:#1a1a2e;margin:0 0 10px;line-height:1.3;' +
+               'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
+               escapeHtml(p.title || '') + '</p>' +
+            '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;">' +
+                '<span style="font-size:22px;font-weight:800;color:var(--baltic);">' + priceLbl + '</span>' +
+                '<span style="font-size:13px;color:#94a3b8;text-decoration:line-through;">' + origLbl + '</span>' +
+            '</div>' +
+            '<p style="font-size:12px;color:#94a3b8;margin:0;">Por <strong style="color:#64748b;">' + escapeHtml(selName) + '</strong>' +
+               (remaining > 1 ? ' · <span style="color:#b0b5bf;">' + (remaining) + ' remates</span>' : '') +
+            '</p>' +
+        '</div>';
+
+    /* Swipe hint labels */
+    var likeLabel = document.createElement('div');
+    likeLabel.style.cssText = 'position:absolute;top:20px;left:14px;border:3px solid #22c55e;color:#22c55e;' +
+        'font-weight:800;font-size:18px;padding:4px 10px;border-radius:8px;opacity:0;' +
+        'transform:rotate(-12deg);pointer-events:none;background:#fff;';
+    likeLabel.textContent = 'CHAT';
+    card.appendChild(likeLabel);
+
+    var passLabel = document.createElement('div');
+    passLabel.style.cssText = 'position:absolute;top:20px;right:14px;border:3px solid #f87171;color:#f87171;' +
+        'font-weight:800;font-size:18px;padding:4px 10px;border-radius:8px;opacity:0;' +
+        'transform:rotate(12deg);pointer-events:none;background:#fff;';
+    passLabel.textContent = 'PASS';
+    card.appendChild(passLabel);
+
+    wrapOuter.appendChild(card);
+    stack.appendChild(wrapOuter);
+
+    /* ── Action buttons ── */
+    var btns = document.createElement('div');
+    btns.style.cssText = 'display:flex;gap:28px;margin-top:22px;justify-content:center;';
+    btns.innerHTML =
+        '<button onclick="_cholloNext(\'left\')" style="width:56px;height:56px;border-radius:50%;background:#fff;border:2px solid #f87171;' +
+            'color:#f87171;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;' +
+            'box-shadow:0 4px 12px rgba(0,0,0,0.1);">✕</button>' +
+        '<button onclick="_cholloLike(this)" style="width:64px;height:64px;border-radius:50%;background:#fff;border:2px solid #e11d48;' +
+            'font-size:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;' +
+            'box-shadow:0 4px 16px rgba(225,29,72,0.15);transition:transform 0.2s;">❤️</button>' +
+        '<button onclick="_cholloNext(\'right\')" style="width:56px;height:56px;border-radius:50%;background:#fff;border:2px solid #22c55e;' +
+            'color:#22c55e;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;' +
+            'box-shadow:0 4px 12px rgba(0,0,0,0.1);">✓</button>';
+    stack.appendChild(btns);
+
+    /* ── Touch/Mouse swipe ── */
+    var startX = 0, moved = 0, dragging = false;
+
+    function onStart(e) {
+        startX   = e.touches ? e.touches[0].clientX : e.clientX;
+        dragging = true;
+        card.style.transition = 'none';
+    }
+    function onMove(e) {
+        if (!dragging) return;
+        moved = (e.touches ? e.touches[0].clientX : e.clientX) - startX;
+        var rot = moved * 0.06;
+        card.style.transform = 'translateX(' + moved + 'px) rotate(' + rot + 'deg)';
+        var t = Math.min(Math.abs(moved) / 80, 1);
+        likeLabel.style.opacity = moved > 0 ? t : 0;
+        passLabel.style.opacity = moved < 0 ? t : 0;
+    }
+    function onEnd() {
+        if (!dragging) return;
+        dragging = false;
+        if (Math.abs(moved) > 80) {
+            var dir = moved > 0 ? 'right' : 'left';
+            card.style.transition = 'transform 0.32s ease, opacity 0.32s';
+            card.style.transform  = dir === 'right' ? 'translateX(140%) rotate(20deg)' : 'translateX(-140%) rotate(-20deg)';
+            card.style.opacity    = '0';
+            var captured = moved;
+            moved = 0;
+            setTimeout(function() { _doCholloAction(captured > 0 ? 'right' : 'left'); }, 310);
+        } else {
+            card.style.transition = 'transform 0.25s ease';
+            card.style.transform  = '';
+            likeLabel.style.opacity = 0;
+            passLabel.style.opacity = 0;
+            moved = 0;
+        }
+    }
+
+    card.addEventListener('touchstart', onStart, { passive: true });
+    card.addEventListener('touchmove',  onMove,  { passive: true });
+    card.addEventListener('touchend',   onEnd);
+    card.addEventListener('mousedown',  onStart);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onEnd);
+}
+
+function _cholloNext(dir) {
+    var stack = document.getElementById('chollos-stack');
+    var card  = stack && stack.querySelector('.chollo-card-active');
+    if (card && !card._animating) {
+        card._animating = true;
+        card.style.transition = 'transform 0.32s ease, opacity 0.32s';
+        card.style.transform  = dir === 'right' ? 'translateX(140%) rotate(20deg)' : 'translateX(-140%) rotate(-20deg)';
+        card.style.opacity    = '0';
+        setTimeout(function() { _doCholloAction(dir); }, 310);
+    } else if (!card) {
+        _doCholloAction(dir);
+    }
+}
+
+function _doCholloAction(dir) {
+    var p = _chollosQueue[_chollosIdx];
+    _chollosIdx++;
+    if (dir === 'right' && p && p.seller_id) {
+        var prof      = p.seller || {};
+        var selName   = p.seller_name || prof.username || 'Vendedor';
+        var avatar    = p.seller_avatar_url || null;
+        var priceLbl  = p.price != null ? 'S/ ' + Number(p.price).toLocaleString('es-PE') : '';
+        console.log('selName:', selName, 'p.seller_name:', p.seller_name, 'p:', p);
+        showTab('messages');
+        openChat(p.seller_id, selName, avatar, p.id, p.title, p.image_url, priceLbl, p.seller_id, p.status || 'available');
+    } else {
+        _renderChollosStack();
+    }
+}
+
+function _cholloLike(btn) {
+    if (!isLoggedIn) { requireAuth(function() {}); return; }
+    var p = _chollosQueue[_chollosIdx];
+    if (!p || !p.id) return;
+    var strKey = String(p.id);
+    if (favorites.has(strKey)) {
+        btn.style.transform = 'scale(1.2)';
+        setTimeout(function() { btn.style.transform = ''; }, 200);
+        return;
+    }
+    favorites.add(strKey);
+    btn.style.transform = 'scale(1.4)';
+    setTimeout(function() { btn.style.transform = ''; }, 220);
+    sb.from('favorites')
+        .insert({ user_id: currentUser.id, product_id: strKey })
+        .then(function(r) {
+            if (r.error) favorites.delete(strKey);
+        });
+}
+
+function _openRematesPanel() {
+    if (!isLoggedIn) { requireAuth(function() {}); return; }
+    var panel = document.getElementById('remates-panel');
+    panel.style.display = 'flex';
+    var grid = document.getElementById('remates-fav-grid');
+    grid.innerHTML = '<p style="grid-column:span 2;text-align:center;padding:48px 0;font-size:13px;color:#b0b5bf;">Cargando…</p>';
+
+    sb.from('favorites')
+        .select('product_id')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .then(function(r) {
+            var ids = (r.data || []).map(function(row) { return row.product_id; });
+            if (ids.length === 0) {
+                grid.innerHTML =
+                    '<div style="grid-column:span 2;text-align:center;padding:60px 16px;">' +
+                        '<p style="font-size:14px;color:#94a3b8;line-height:1.6;">Aún no tienes guardados.<br>Dale ❤️ a un remate para guardarlo.</p>' +
+                    '</div>';
+                return;
+            }
+            sb.from('products').select('id, title, image_url, price').in('id', ids).then(function(pr) {
+                var items = pr.data || [];
+                if (items.length === 0) {
+                    grid.innerHTML = '<div style="grid-column:span 2;text-align:center;padding:60px 16px;"><p style="font-size:14px;color:#94a3b8;">No hay productos guardados.</p></div>';
+                    return;
+                }
+                grid.innerHTML = '';
+                items.forEach(function(p) {
+                    var priceLabel = p.price != null ? 'S/ ' + Number(p.price).toLocaleString('es-PE') : '';
+                    var card = document.createElement('div');
+                    card.style.cssText = 'background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);cursor:pointer;';
+                    card.innerHTML =
+                        (p.image_url
+                            ? '<img src="' + escapeHtml(p.image_url) + '" style="width:100%;height:120px;object-fit:cover;display:block;">'
+                            : '<div style="width:100%;height:120px;background:#e6f3f8;"></div>') +
+                        '<div style="padding:10px 10px 12px;">' +
+                            '<p style="font-size:12px;font-weight:600;color:#1a1a2e;margin:0 0 4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + escapeHtml(p.title || '') + '</p>' +
+                            (priceLabel ? '<p style="font-size:13px;font-weight:700;color:var(--baltic);margin:0;">' + priceLabel + '</p>' : '') +
+                        '</div>';
+                    card.onclick = function() { _closeRematesPanel(); openProductById(p.id); };
+                    grid.appendChild(card);
+                });
+            });
+        });
+}
+
+function _closeRematesPanel() {
+    document.getElementById('remates-panel').style.display = 'none';
+}
+
 function loadFavorites() {
     if (!currentUser) return;
     var grid = document.getElementById('savedGrid');
@@ -3367,7 +3901,7 @@ function loadFavorites() {
             if (cached.length > 0) { renderSavedGrid(cached, ids); return; }
 
             // Fallback: buscar en Supabase por los IDs
-            sb.from('products').select('*').in('id', ids).then(function(pr) {
+            sb.from('products').select('*').in('id', ids).eq('is_hidden', false).then(function(pr) {
                 renderSavedGrid(pr.data || [], ids);
             });
         });
@@ -3444,6 +3978,12 @@ function buildCard(p, idOrKey) {
             '<p class="card-title" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + (p.title || '') + '</p>' +
             '<p class="card-price" style="margin-top:5px;">' + priceLabel + '</p>' +
             '<p class="card-location">' + (p.location || '') + '</p>' +
+            (p.seller_name || p.seller
+                ? '<div style="display:flex;align-items:center;gap:3px;margin-top:5px;">' +
+                      '<p style="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(p.seller_name || p.seller || '') + '</p>' +
+                      _trustBadgeHtml(p.seller_phone_verified, p.seller_sales_count, p.seller_rating) +
+                  '</div>'
+                : '') +
         '</div>';
 
     card.onclick = function() {
@@ -3456,11 +3996,14 @@ function buildCard(p, idOrKey) {
             images:     imgArr,
             desc:       p.description || p.desc || '',
             location:   p.location || '',
-            seller:            p.seller_name || p.seller || 'Vendedor',
-            seller_id:         p.seller_id || null,
-            seller_avatar_url: p.seller_avatar_url || null,
-            rating:            p.rating || 5.0,
-            reviews:           p.reviews || 0,
+            seller:                p.seller_name || p.seller || 'Vendedor',
+            seller_id:             p.seller_id || null,
+            seller_avatar_url:     p.seller_avatar_url || null,
+            seller_phone_verified: p.seller_phone_verified || false,
+            seller_sales_count:    p.seller_sales_count    || 0,
+            seller_rating:         p.seller_rating         || p.rating || 0,
+            rating:                p.seller_rating || 0,
+            reviews:               p.seller_sales_count || 0,
             category:          p.category || '',
             condition:         p.condition || '',
             status:            p.status    || 'available',
@@ -3597,6 +4140,7 @@ function fetchProducts() {
     sb.from('products')
         .select('*')
         .eq('status', 'available')
+        .eq('is_hidden', false)
         .order('created_at', { ascending: false })
         .then(function(result) {
             if (result.error) {
@@ -3616,16 +4160,19 @@ function fetchProducts() {
             var unique    = sellerIds.filter(function(v, i, a) { return a.indexOf(v) === i; });
             if (unique.length === 0) { renderProducts(products); return; }
 
-            sb.from('profiles').select('id, username, avatar_url').in('id', unique)
+            sb.from('profiles').select('id, username, avatar_url, phone_verified, sales_count, rating').in('id', unique)
                 .then(function(pr) {
                     var pm = {};
                     (pr.data || []).forEach(function(prof) { pm[prof.id] = prof; });
-                    // Merge avatar + username into each product row
+                    // Merge profile fields into each product row
                     var enriched = products.map(function(p) {
                         var prof = pm[p.seller_id] || {};
                         return Object.assign({}, p, {
-                            seller_name:       prof.username       || p.seller_name,
-                            seller_avatar_url: prof.avatar_url     || null
+                            seller_name:           prof.username       || p.seller_name,
+                            seller_avatar_url:     prof.avatar_url     || null,
+                            seller_phone_verified: prof.phone_verified || false,
+                            seller_sales_count:    prof.sales_count    || 0,
+                            seller_rating:         prof.rating         || 0
                         });
                     });
                     renderProducts(enriched);
@@ -3672,6 +4219,26 @@ function openEdit(id) {
     document.querySelector('#publish-sheet h2').textContent = 'Editar anuncio';
     var btn = document.querySelector('#publish-sheet .btn-primary');
     btn.textContent = 'Guardar cambios';
+
+    // Preview existing saved photos (no añaden a publishPhotos)
+    var _existingImgs = (p.images && p.images.length > 0) ? p.images : (p.image ? [p.image] : []);
+    var _area = document.getElementById('photoPreviewArea');
+    _area.querySelectorAll('.photo-thumb-wrap').forEach(function(w) { w.remove(); });
+    _existingImgs.forEach(function(url) {
+        var wrap = document.createElement('div');
+        wrap.className = 'photo-thumb-wrap';
+        var img = document.createElement('img');
+        img.src = url;
+        img.className = 'photo-thumb';
+        var del = document.createElement('button');
+        del.className = 'photo-thumb-del';
+        del.type = 'button';
+        del.textContent = '×';
+        del.onclick = function() { wrap.remove(); };
+        wrap.appendChild(img);
+        wrap.appendChild(del);
+        _area.appendChild(wrap);
+    });
 
     document.getElementById('publish-overlay').classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -3890,7 +4457,7 @@ function submitPublish() {
 
     _clearAllFieldErrors();
     var errors = [];
-    if (publishPhotos.length === 0) { _setFieldError('pub-photos', 'Añade al menos una foto'); errors.push('pub-photos-wrap'); }
+    if (!editingProductId && publishPhotos.length === 0) { _setFieldError('pub-photos', 'Añade al menos una foto'); errors.push('pub-photos-wrap'); }
     if (!title)    { _setFieldError('pub-title',    'Este campo es obligatorio'); errors.push('pub-title'); }
     if (!price || isNaN(price) || price <= 0) { _setFieldError('pub-price', 'Ingresa un precio válido'); errors.push('pub-price'); }
     if (!category) { _setFieldError('pub-category', 'Este campo es obligatorio'); errors.push('pub-category'); }
@@ -4357,6 +4924,27 @@ document.addEventListener('keydown', function(e) {
 /* ── INIT ── */
 updatePriceSlider(null);   // inicializar barra de precio
 fetchProducts();
+if (document.visibilityState !== 'hidden') {
+    showTab(localStorage.getItem('activeTab') || 'home');
+}
+
+document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+        var saved = localStorage.getItem('activeTab');
+        if (saved && saved !== currentTab) {
+            // Solo cambia la vista activa sin recargar datos
+            document.querySelectorAll('.view').forEach(function(v) {
+                v.style.display = 'none';
+            });
+            var target = document.getElementById(saved + '-view');
+            if (target) target.style.display = 'block';
+            currentTab = saved;
+            document.querySelectorAll('.nav-btn').forEach(function(b) {
+                b.classList.toggle('active', b.getAttribute('data-tab') === saved);
+            });
+        }
+    }
+});
 
 // Si la URL ya trae ?product=id al cargar la página, abrir ese producto
 (function() {
@@ -4814,6 +5402,25 @@ async function submitPendingReview() {
                  cursor:pointer;font-family:inherit;letter-spacing:.02em;">
     Enviar contraoferta
   </button>
+</div>
+
+<!-- ── Report Sheet ── -->
+<div id="report-overlay" onclick="closeReportSheet()"
+     style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);
+            z-index:1200;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);"></div>
+<div id="report-sheet"
+     style="position:fixed;bottom:0;left:0;right:0;max-width:540px;margin:0 auto;
+            background:#fff;border-radius:24px 24px 0 0;z-index:1201;
+            padding:0 20px 44px;
+            transform:translateY(100%);
+            transition:transform .32s cubic-bezier(.32,.72,0,1);
+            box-shadow:0 -8px 40px rgba(0,0,0,.18);">
+  <div style="display:flex;justify-content:center;padding:14px 0 20px;">
+    <div style="width:40px;height:4px;border-radius:2px;background:#e2e8f0;"></div>
+  </div>
+  <p style="font-size:18px;font-weight:800;color:#0f172a;margin:0 0 6px;">Denunciar anuncio</p>
+  <p style="font-size:13px;color:#94a3b8;margin:0 0 20px;">¿Cuál es el motivo de tu denuncia?</p>
+  <div id="report-reasons" style="display:flex;flex-direction:column;gap:10px;"></div>
 </div>
 
 </body>
