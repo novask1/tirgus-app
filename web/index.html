@@ -3574,7 +3574,10 @@ function loadChollos() {
 
             fetch('https://kwejkzojjuxceogdihio.supabase.co/functions/v1/clever-worker', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3ZWprem9qanV4Y2VvZ2RpaGlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUwMTYzMTIsImV4cCI6MjA2MDU5MjMxMn0.3OdMCFgGPBMl7DMHMnMnpbkKFobLqgkWHSNFcNZOvpI'
+                },
                 body: JSON.stringify({ products: allProds.map(function(p) {
                     return { title: p.title, price: p.price, original_price: p.original_price || null };
                 })})
