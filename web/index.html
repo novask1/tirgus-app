@@ -3554,15 +3554,17 @@ function loadChollos() {
         .select('*')
         .eq('status', 'available')
         .eq('is_hidden', false)
-        .not('original_price', 'is', null)
         .limit(30)
         .then(function(r) {
             if (r.error || !r.data) {
                 stack.innerHTML = '<p style="font-size:13px;color:#b0b5bf;text-align:center;padding-top:60px;">No se pudieron cargar los remates.</p>';
                 return;
             }
+            var keywords = ['iphone', 'ipad', 'macbook', 'samsung', 'xiaomi', 'redmi', 'motorola', 'moto', 'realme', 'poco', 'laptop', 'portatil', 'portátil', 'lenovo', 'hp ', 'dell', 'asus', 'acer'];
             var allProds = r.data.filter(function(p) {
-                return !(currentUser && p.seller_id === currentUser.id);
+                if (currentUser && p.seller_id === currentUser.id) return false;
+                var title = (p.title || '').toLowerCase();
+                return keywords.some(function(k) { return title.indexOf(k) !== -1; });
             }).slice(0, 30);
 
             if (allProds.length === 0) {
@@ -3577,7 +3579,10 @@ function loadChollos() {
                     return { title: p.title, price: p.price, original_price: p.original_price || null };
                 })})
             }).then(function(res) { return res.json(); }).then(function(aiRes) {
-                var titles = aiRes.titles || [];
+                var chollosArr = aiRes.chollos || [];
+                var titles = aiRes.titles || chollosArr.map(function(c) { return c.title; });
+                var chollosMap = {};
+                chollosArr.forEach(function(c) { if (c.title) chollosMap[c.title] = c.market_price || null; });
                 var filtered = allProds.filter(function(p) {
                     return titles.indexOf(p.title) !== -1;
                 });
@@ -3594,7 +3599,8 @@ function loadChollos() {
                         var prof = pm[p.seller_id] || {};
                         return Object.assign({}, p, {
                             seller_name: prof.username || p.seller_name,
-                            seller_avatar_url: prof.avatar_url || null
+                            seller_avatar_url: prof.avatar_url || null,
+                            market_price: chollosMap.hasOwnProperty(p.title) ? (chollosMap[p.title] ? Math.round(chollosMap[p.title] * 1.2) : null) : null
                         });
                     });
                     _chollosIdx = 0;
@@ -3650,13 +3656,14 @@ function _renderChollosStack() {
         return;
     }
 
-    var p       = _chollosQueue[_chollosIdx];
-    var disc    = Math.round((p.original_price - p.price) / p.original_price * 100);
-    var prof    = p.seller || {};
-    var selName = prof.username || p.seller_name || 'Vendedor';
-    var imgSrc  = (p.images && p.images[0]) || p.image_url || '';
+    var p        = _chollosQueue[_chollosIdx];
+    var refPrice = p.market_price || p.original_price || null;
+    var disc     = (refPrice && refPrice > p.price) ? Math.round((refPrice - p.price) / refPrice * 100) : 0;
+    var prof     = p.seller || {};
+    var selName  = prof.username || p.seller_name || 'Vendedor';
+    var imgSrc   = (p.images && p.images[0]) || p.image_url || '';
     var priceLbl = 'S/ ' + Number(p.price).toLocaleString('es-PE');
-    var origLbl  = 'S/ ' + Number(p.original_price).toLocaleString('es-PE');
+    var origLbl  = (refPrice && refPrice > p.price) ? 'S/ ' + Number(refPrice).toLocaleString('es-PE') : '';
     var remaining = _chollosQueue.length - _chollosIdx;
 
     /* ── Background shadow cards ── */
@@ -3685,7 +3692,7 @@ function _renderChollosStack() {
                 ? '<img src="' + escapeHtml(imgSrc) + '" alt="" style="width:100%;height:290px;object-fit:cover;display:block;">'
                 : '<div style="width:100%;height:290px;background:#e6f3f8;display:flex;align-items:center;justify-content:center;">' +
                   '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#b0cfe0" stroke-width="1.3"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>') +
-            '<span style="position:absolute;top:14px;right:14px;background:#22c55e;color:#fff;font-weight:800;font-size:14px;padding:5px 12px;border-radius:99px;">-' + disc + '%</span>' +
+            (disc > 0 ? '<span style="position:absolute;top:14px;right:14px;background:#22c55e;color:#fff;font-weight:800;font-size:14px;padding:5px 12px;border-radius:99px;">-' + disc + '%</span>' : '') +
         '</div>' +
         '<div style="padding:18px 20px 20px;">' +
             '<p style="font-size:16px;font-weight:700;color:#1a1a2e;margin:0 0 10px;line-height:1.3;' +
@@ -3693,7 +3700,7 @@ function _renderChollosStack() {
                escapeHtml(p.title || '') + '</p>' +
             '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;">' +
                 '<span style="font-size:22px;font-weight:800;color:var(--baltic);">' + priceLbl + '</span>' +
-                '<span style="font-size:13px;color:#94a3b8;text-decoration:line-through;">' + origLbl + '</span>' +
+                (origLbl ? '<span style="font-size:13px;color:#94a3b8;text-decoration:line-through;">' + origLbl + '</span>' : '') +
             '</div>' +
             '<p style="font-size:12px;color:#94a3b8;margin:0;">Por <strong style="color:#64748b;">' + escapeHtml(selName) + '</strong>' +
                (remaining > 1 ? ' · <span style="color:#b0b5bf;">' + (remaining) + ' remates</span>' : '') +
