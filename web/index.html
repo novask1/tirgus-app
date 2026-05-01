@@ -3572,24 +3572,41 @@ function loadChollos() {
                 return;
             }
 
-            fetch('https://kwejkzojjuxceogdihio.supabase.co/functions/v1/clever-worker', {
+            var productsText = allProds.map(function(p) {
+                return '"' + p.title + '" S/' + p.price;
+            }).join('\n');
+            var promptText = 'Eres experto en precios de segunda mano en Lima, Perú. Los precios están en soles (S/).\n\nPRECIOS NORMALES:\niPhone 11:S/650, iPhone 12:S/800, iPhone 13:S/1150, iPhone 14:S/1600, iPhone 15:S/2100, iPhone 16:S/2700\niPhone Pro añade S/250, Pro Max añade S/400\nSamsung A14:S/320, A34:S/500, A54:S/650, S22:S/950, S23:S/1200, S24:S/1600\nXiaomi Redmi Note 12:S/380, Note 13:S/450, 13T:S/850\nMotorola G54:S/350, G84:S/420\nMacBook Air M1:S/2800, M2:S/3500\nPortátil gama alta (Zenbook,XPS,ThinkPad):S/1800\nPortátil gama media (HP,Dell,Lenovo,VivoBook):S/1200\n\nREGLAS:\n1. El precio MÁXIMO es el precio NORMAL\n2. Si precio del producto < precio normal → ES remate\n3. market_price = precio normal del producto\n4. Ignora accesorios (fundas, cargadores, cables)\n5. Responde SOLO con JSON sin backticks:\n[{"title":"título exacto","market_price":1800}]\n\nProductos:\n' + productsText;
+
+            fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3ZWprem9qanV4Y2VvZ2RpaGlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUwMTYzMTIsImV4cCI6MjA2MDU5MjMxMn0.3OdMCFgGPBMl7DMHMnMnpbkKFobLqgkWHSNFcNZOvpI'
+                    'Authorization': 'Bearer TU_API_KEY'
                 },
-                body: JSON.stringify({ products: allProds.map(function(p) {
-                    return { title: p.title, price: p.price, original_price: p.original_price || null };
-                })})
-            }).then(function(res) { return res.json(); }).then(function(aiRes) {
-                var chollosArr = aiRes.chollos || [];
-                var titles = aiRes.titles || chollosArr.map(function(c) { return c.title; });
-                var chollosMap = {};
-                chollosArr.forEach(function(c) { if (c.title) chollosMap[c.title] = c.market_price || null; });
+                body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    messages: [{ role: 'user', content: promptText }]
+                })
+            }).then(function(r) { return r.json(); }).then(function(data) {
+                var chollos = [];
+                try {
+                    var content = data.choices[0].message.content;
+                    var clean = content.replace(/```json|```/g, '').trim();
+                    chollos = JSON.parse(clean);
+                    if (!Array.isArray(chollos)) chollos = [];
+                } catch(e) { chollos = []; }
+
+                var titles = chollos.map(function(c) { return c.title; });
                 var filtered = allProds.filter(function(p) {
-                    return titles.indexOf(p.title) !== -1;
+                    return titles.some(function(t) { return t === p.title; });
                 });
                 if (filtered.length === 0) filtered = allProds.slice(0, 8);
+
+                filtered = filtered.map(function(p) {
+                    var match = chollos.find(function(c) { return c.title === p.title; });
+                    return Object.assign({}, p, { market_price: match ? Math.round(match.market_price) : null });
+                });
+
                 var sellerIds = filtered.map(function(p) { return p.seller_id; }).filter(Boolean);
                 var unique = sellerIds.filter(function(v, i, a) { return a.indexOf(v) === i; });
                 (unique.length
@@ -3602,33 +3619,16 @@ function loadChollos() {
                         var prof = pm[p.seller_id] || {};
                         return Object.assign({}, p, {
                             seller_name: prof.username || p.seller_name,
-                            seller_avatar_url: prof.avatar_url || null,
-                            market_price: chollosMap.hasOwnProperty(p.title) ? (chollosMap[p.title] ? Math.round(chollosMap[p.title] * 1.2) : null) : null
-                        });
-                    });
-                    _chollosIdx = 0;
-                    _renderChollosStack();
-                });
-            }).catch(function() {
-                var filtered = allProds.slice(0, 8);
-                var sellerIds = filtered.map(function(p) { return p.seller_id; }).filter(Boolean);
-                var unique = sellerIds.filter(function(v, i, a) { return a.indexOf(v) === i; });
-                (unique.length
-                    ? sb.from('profiles').select('id, username, avatar_url').in('id', unique)
-                    : Promise.resolve({ data: [] })
-                ).then(function(pr) {
-                    var pm = {};
-                    (pr.data || []).forEach(function(prof) { pm[prof.id] = prof; });
-                    _chollosQueue = filtered.map(function(p) {
-                        var prof = pm[p.seller_id] || {};
-                        return Object.assign({}, p, {
-                            seller_name: prof.username || null,
                             seller_avatar_url: prof.avatar_url || null
                         });
                     });
                     _chollosIdx = 0;
                     _renderChollosStack();
                 });
+            }).catch(function() {
+                _chollosQueue = allProds.slice(0, 8);
+                _chollosIdx = 0;
+                _renderChollosStack();
             });
         });
 }
