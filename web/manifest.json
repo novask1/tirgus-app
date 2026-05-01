@@ -1,0 +1,15 @@
+{
+  "name": "Tirgus",
+  "short_name": "Tirgus",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a6e8e",
+  "theme_color": "#1a6e8e",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
